@@ -64,10 +64,13 @@ class AuthController extends StateNotifier<AuthState> {
 
   void _init() {
     _authRepo.authStateChanges().listen((user) async {
+      print('🔐 Auth: Auth state changed - User: ${user?.uid ?? 'null'}');
       if (user != null) {
+        print('🔐 Auth: User found, loading profile...');
         await _loadUserProfile(user.uid);
       } else {
-        state = const AuthState(isAuthenticated: false);
+        print('🔐 Auth: No user, setting unauthenticated state');
+        state = const AuthState(isAuthenticated: false, isLoading: false);
       }
     });
   }
@@ -164,18 +167,21 @@ class AuthController extends StateNotifier<AuthState> {
         return;
       }
       
-      print('🔐 Auth: Current user found, loading profile...');
+      print('🔐 Auth: Current user found (${user.uid}), loading profile...');
+      
+      // Check if user is already authenticated to avoid unnecessary loading
+      if (state.isAuthenticated && state.profile != null) {
+        print('🔐 Auth: User already authenticated, skipping profile reload');
+        return;
+      }
+      
       await _loadUserProfile(user.uid).timeout(const Duration(seconds: 15));
       print('✅ Auth: Session restoration completed');
     } catch (e) {
       print('❌ Auth: Session restoration failed: $e');
-      // Set a basic authenticated state even if profile loading fails
-      state = AuthState(
-        isAuthenticated: true,
-        firstLoginRequired: false,
-        profile: null,
-        isLoading: false,
-      );
+      // Don't set authenticated state if profile loading fails
+      // This ensures we don't get stuck in a bad state
+      state = const AuthState(isAuthenticated: false, isLoading: false);
     }
   }
 
@@ -323,11 +329,15 @@ class AuthController extends StateNotifier<AuthState> {
           print('⚠️ Auth: Failed to generate FCM token (continuing): $e');
           // Continue even if FCM token generation fails
         }
+        
+        // Complete first login to ensure proper state
+        print('🔐 Auth: Completing first login...');
+        await completeFirstLogin();
+        print('✅ Auth: Login process completed');
+      } else {
+        print('❌ Auth: No user after login, this should not happen');
+        throw Exception('Login succeeded but no user found');
       }
-      
-      print('🔐 Auth: Completing first login...');
-      await completeFirstLogin();
-      print('✅ Auth: Login process completed');
     } catch (e) {
       print('❌ Auth: Login failed: $e');
       

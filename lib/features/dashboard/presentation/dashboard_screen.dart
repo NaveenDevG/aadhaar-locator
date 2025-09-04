@@ -171,61 +171,6 @@ class DashboardScreen extends ConsumerWidget {
                     Navigator.of(context).pushNamed(AppRouter.locationSharingDemo);
                   },
                 ),
-                                _buildActionCard(
-                  context,
-                  'Notifications',
-                  Icons.notifications,
-                  Colors.orange,
-                  () {
-                    // Test notification
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('🔔 Test notification sent! Check your device notifications.'),
-                        backgroundColor: Colors.orange,
-                        duration: Duration(seconds: 3),
-                      ),
-                    );
-                    
-                    // Show a simple dialog with notification info
-                    showDialog(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: Row(
-                          children: [
-                            Icon(Icons.notifications, color: Colors.orange),
-                            const SizedBox(width: 8),
-                            const Text('Notifications Status'),
-                          ],
-                        ),
-                        content: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('🔔 FCM (Firebase Cloud Messaging) is configured for:'),
-                            const SizedBox(height: 8),
-                            const Text('• Location sharing notifications'),
-                            const Text('• Real-time updates'),
-                            const Text('• Background message handling'),
-                            const SizedBox(height: 8),
-                            Text(
-                              'When other users share their location, you\'ll receive push notifications.',
-                              style: TextStyle(
-                                color: Colors.grey.shade600,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ],
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.of(context).pop(),
-                            child: const Text('OK'),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
                 _buildActionCard(
                   context,
                               'Profile',

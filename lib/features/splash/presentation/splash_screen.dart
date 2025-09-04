@@ -133,10 +133,15 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       
       if (!mounted) return;
 
+      // Wait a bit for auth state to settle
+      await Future.delayed(const Duration(milliseconds: 500));
+      
       final authState = ref.read(authControllerProvider);
       print('👤 Auth state: ${authState.isAuthenticated ? 'Authenticated' : 'Not authenticated'}');
+      print('👤 First login required: ${authState.firstLoginRequired}');
+      print('👤 Profile loaded: ${authState.profile != null}');
 
-      if (authState.isAuthenticated) {
+      if (authState.isAuthenticated && authState.profile != null) {
         if (authState.firstLoginRequired) {
           print('🆕 First login required, completing...');
           try {

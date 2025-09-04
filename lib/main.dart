@@ -86,7 +86,7 @@ class MyApp extends ConsumerWidget {
       darkTheme: AppTheme.dark,
       themeMode: ThemeMode.system,
       debugShowCheckedModeBanner: false,
-      initialRoute: authState.isLoading ? AppRouter.splash : _getInitialRoute(authState),
+      initialRoute: AppRouter.splash, // Always start with splash for proper auth restoration
       routes: AppRouter.routes,
     );
   }
