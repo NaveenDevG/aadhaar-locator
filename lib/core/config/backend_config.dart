@@ -1,6 +1,6 @@
 class BackendConfig {
   // Railway backend URL - replace with your actual Railway URL after deployment
-  static const String baseUrl = 'https://your-app-name.railway.app';
+  static const String baseUrl = 'https://aadhaar-locator-production.up.railway.app';
   
   // Local development URL (for testing)
   static const String localUrl = 'http://localhost:3000';
