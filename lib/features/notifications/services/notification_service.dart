@@ -1,5 +1,6 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'fcm_service.dart';
 
 class NotificationService {
@@ -36,6 +37,81 @@ class NotificationService {
   static void _onNotificationTapped(NotificationResponse response) {
     // Handle notification tap
     print('Notification tapped: ${response.payload}');
+    
+    // Parse payload and open location directly in maps if it's a location share
+    if (response.payload != null) {
+      try {
+        // Parse the payload string back to Map
+        final payloadString = response.payload!;
+        print('📱 NotificationService: Parsing payload: $payloadString');
+        
+        // Simple parsing for location share notifications
+        if (payloadString.contains('type') && payloadString.contains('location_share')) {
+          _openLocationDirectlyInMapsFromPayload(payloadString);
+        }
+      } catch (e) {
+        print('❌ NotificationService: Failed to parse notification payload: $e');
+      }
+    }
+  }
+
+  /// Open location directly in Google Maps from notification payload
+  static Future<void> _openLocationDirectlyInMapsFromPayload(String payloadString) async {
+    try {
+      // Extract coordinates from payload string
+      // This is a simple extraction - in production you might want more robust parsing
+      final latMatch = RegExp(r'latitude[^0-9-]*([0-9.-]+)').firstMatch(payloadString);
+      final lngMatch = RegExp(r'longitude[^0-9-]*([0-9.-]+)').firstMatch(payloadString);
+      final nameMatch = RegExp(r'senderName[^a-zA-Z]*([a-zA-Z\s]+)').firstMatch(payloadString);
+      
+      if (latMatch != null && lngMatch != null) {
+        final latitude = double.tryParse(latMatch.group(1) ?? '0') ?? 0.0;
+        final longitude = double.tryParse(lngMatch.group(1) ?? '0') ?? 0.0;
+        final senderName = nameMatch?.group(1)?.trim() ?? 'User';
+        
+        print('🗺️ NotificationService: Opening location directly in Google Maps...');
+        print('📍 Coordinates: $latitude, $longitude');
+        print('👤 Sender: $senderName');
+        
+        final coordinates = '$latitude,$longitude';
+        final locationName = senderName.replaceAll(' ', '+');
+        
+        // Try different Google Maps URLs in order of preference
+        final urls = [
+          // Google Maps app (Android/iOS)
+          'comgooglemaps://?q=$coordinates&center=$coordinates&zoom=15',
+          // Apple Maps (iOS)
+          'http://maps.apple.com/?q=$coordinates&ll=$coordinates&z=15',
+          // Google Maps web with location name
+          'https://www.google.com/maps/search/?api=1&query=$locationName+$coordinates&zoom=15',
+          // Google Maps web with coordinates only
+          'https://www.google.com/maps/search/?api=1&query=$coordinates&zoom=15',
+        ];
+        
+        bool opened = false;
+        for (final url in urls) {
+          try {
+            if (await canLaunchUrl(Uri.parse(url))) {
+              await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+              print('✅ NotificationService: Opened in maps app: $url');
+              opened = true;
+              break;
+            }
+          } catch (e) {
+            print('⚠️ NotificationService: Failed to open $url: $e');
+            continue;
+          }
+        }
+        
+        if (!opened) {
+          print('❌ NotificationService: Could not open any maps app from notification');
+        }
+      } else {
+        print('⚠️ NotificationService: Could not extract coordinates from payload');
+      }
+    } catch (e) {
+      print('❌ NotificationService: Failed to open location in maps from payload: $e');
+    }
   }
 
   /// Handle FCM message and show local notification

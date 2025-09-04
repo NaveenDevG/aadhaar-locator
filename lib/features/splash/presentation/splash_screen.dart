@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/routing/app_router.dart';
 import '../../auth/providers/auth_providers.dart';
 import '../../notifications/services/fcm_service.dart';
@@ -58,6 +59,73 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     _animationController.forward();
   }
 
+  /// Open location directly in Google Maps when notification is tapped
+  Future<void> _openLocationDirectlyInMaps(Map<String, dynamic> payload) async {
+    try {
+      final latitude = payload['latitude'] as double? ?? 0.0;
+      final longitude = payload['longitude'] as double? ?? 0.0;
+      final senderName = payload['senderName'] as String? ?? 'User';
+      
+      print('🗺️ SplashScreen: Opening location directly in Google Maps...');
+      print('📍 Coordinates: $latitude, $longitude');
+      print('👤 Sender: $senderName');
+      
+      final coordinates = '$latitude,$longitude';
+      final locationName = senderName.replaceAll(' ', '+');
+      
+      // Try different Google Maps URLs in order of preference
+      final urls = [
+        // Google Maps app (Android/iOS)
+        'comgooglemaps://?q=$coordinates&center=$coordinates&zoom=15',
+        // Apple Maps (iOS)
+        'http://maps.apple.com/?q=$coordinates&ll=$coordinates&z=15',
+        // Google Maps web with location name
+        'https://www.google.com/maps/search/?api=1&query=$locationName+$coordinates&zoom=15',
+        // Google Maps web with coordinates only
+        'https://www.google.com/maps/search/?api=1&query=$coordinates&zoom=15',
+      ];
+      
+      bool opened = false;
+      for (final url in urls) {
+        try {
+          if (await canLaunchUrl(Uri.parse(url))) {
+            await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+            print('✅ SplashScreen: Opened in maps app: $url');
+            opened = true;
+            break;
+          }
+        } catch (e) {
+          print('⚠️ SplashScreen: Failed to open $url: $e');
+          continue;
+        }
+      }
+      
+      if (!opened) {
+        print('❌ SplashScreen: Could not open any maps app, falling back to app navigation');
+        // Fallback: Navigate to app's map screen
+        Navigator.of(context).pushNamed(
+          AppRouter.map,
+          arguments: {
+            'senderName': senderName,
+            'lat': latitude,
+            'lng': longitude,
+          },
+        );
+      }
+    } catch (e) {
+      print('❌ SplashScreen: Failed to open location in maps: $e');
+      // Fallback: Navigate to app's map screen
+      Navigator.of(context).pushNamed(
+        AppRouter.map,
+        arguments: {
+          'senderName': payload['senderName'] ?? 'User',
+          'lat': payload['latitude'] ?? 0.0,
+          'lng': payload['longitude'] ?? 0.0,
+        },
+      );
+    }
+  }
+
   Future<void> _bootstrap() async {
     try {
       print('🔄 Starting bootstrap process...');
@@ -99,14 +167,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
         await FCMService.initialize(
           onDeepLinkToMap: (payload) {
             if (!mounted) return;
-            Navigator.of(context).pushNamed(
-              AppRouter.map,
-              arguments: {
-                'senderName': payload['senderName'],
-                'lat': payload['latitude'],
-                'lng': payload['longitude'],
-              },
-            );
+            _openLocationDirectlyInMaps(payload);
           },
         );
         print('✅ FCM service initialized successfully');

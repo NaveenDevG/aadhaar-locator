@@ -2,6 +2,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'notification_service.dart';
 
 class FCMService {
@@ -150,8 +151,59 @@ class FCMService {
     print('👆 FCM: Notification tapped: ${message.messageId}');
     print('👆 FCM: Message data: ${message.data}');
 
-    // Handle navigation based on message data
-    // This will be implemented in the main app navigation
+    // Handle direct maps opening for location share notifications
+    if (message.data['type'] == 'location_share') {
+      _openLocationDirectlyInMapsFromNotification(message.data);
+    }
+  }
+
+  /// Open location directly in Google Maps from notification tap
+  static Future<void> _openLocationDirectlyInMapsFromNotification(Map<String, dynamic> data) async {
+    try {
+      final latitude = double.tryParse(data['latitude'] ?? '0') ?? 0.0;
+      final longitude = double.tryParse(data['longitude'] ?? '0') ?? 0.0;
+      final senderName = data['senderName'] ?? 'User';
+      
+      print('🗺️ FCM: Opening location directly in Google Maps from notification...');
+      print('📍 Coordinates: $latitude, $longitude');
+      print('👤 Sender: $senderName');
+      
+      final coordinates = '$latitude,$longitude';
+      final locationName = senderName.replaceAll(' ', '+');
+      
+      // Try different Google Maps URLs in order of preference
+      final urls = [
+        // Google Maps app (Android/iOS)
+        'comgooglemaps://?q=$coordinates&center=$coordinates&zoom=15',
+        // Apple Maps (iOS)
+        'http://maps.apple.com/?q=$coordinates&ll=$coordinates&z=15',
+        // Google Maps web with location name
+        'https://www.google.com/maps/search/?api=1&query=$locationName+$coordinates&zoom=15',
+        // Google Maps web with coordinates only
+        'https://www.google.com/maps/search/?api=1&query=$coordinates&zoom=15',
+      ];
+      
+      bool opened = false;
+      for (final url in urls) {
+        try {
+          if (await canLaunchUrl(Uri.parse(url))) {
+            await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+            print('✅ FCM: Opened in maps app: $url');
+            opened = true;
+            break;
+          }
+        } catch (e) {
+          print('⚠️ FCM: Failed to open $url: $e');
+          continue;
+        }
+      }
+      
+      if (!opened) {
+        print('❌ FCM: Could not open any maps app from notification');
+      }
+    } catch (e) {
+      print('❌ FCM: Failed to open location in maps from notification: $e');
+    }
   }
 
   /// Handle deep links from notifications
