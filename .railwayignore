@@ -1,0 +1,19 @@
+# Ignore Flutter project files
+lib/
+android/
+ios/
+linux/
+macos/
+windows/
+web/
+test/
+pubspec.yaml
+pubspec.lock
+analysis_options.yaml
+.dart_tool/
+build/
+*.iml
+.metadata
+
+# Keep only fcm-backend directory
+!fcm-backend/
