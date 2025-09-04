@@ -253,65 +253,159 @@ class _LocationSharingScreenState extends ConsumerState<LocationSharingScreen>
 
   Future<void> _openInGoogleMaps(LocationShare share) async {
     try {
-      // Try to open in Google Maps app first
-      final googleMapsUrl = 'https://www.google.com/maps?q=${share.latitude},${share.longitude}';
-      final googleMapsAppUrl = 'comgooglemaps://?q=${share.latitude},${share.longitude}';
+      print('🗺️ LocationSharingScreen: Opening ${share.senderName}\'s location in maps...');
       
-      // Try to launch Google Maps app
-      if (await canLaunchUrl(Uri.parse(googleMapsAppUrl))) {
-        await launchUrl(Uri.parse(googleMapsAppUrl));
-        print('✅ LocationSharingScreen: Opened ${share.senderName}\'s location in Google Maps app');
-        return;
+      // Try different URL schemes for better compatibility
+      final coordinates = '${share.latitude},${share.longitude}';
+      final locationName = share.senderName.replaceAll(' ', '+');
+      
+      // 1. Try Google Maps app with coordinates
+      final googleMapsAppUrl = 'comgooglemaps://?q=$coordinates&center=$coordinates&zoom=15';
+      
+      // 2. Try Apple Maps (iOS)
+      final appleMapsUrl = 'http://maps.apple.com/?q=$coordinates&ll=$coordinates&z=15';
+      
+      // 3. Try Google Maps web with better formatting
+      final googleMapsWebUrl = 'https://www.google.com/maps/search/?api=1&query=$coordinates&zoom=15';
+      
+      // 4. Try Google Maps with location name
+      final googleMapsWithName = 'https://www.google.com/maps/search/?api=1&query=$locationName+$coordinates';
+      
+      // Try Google Maps app first
+      try {
+        if (await canLaunchUrl(Uri.parse(googleMapsAppUrl))) {
+          await launchUrl(Uri.parse(googleMapsAppUrl));
+          print('✅ LocationSharingScreen: Opened ${share.senderName}\'s location in Google Maps app');
+          return;
+        }
+      } catch (e) {
+        print('⚠️ LocationSharingScreen: Google Maps app not available: $e');
       }
       
-      // Fallback to web browser
-      if (await canLaunchUrl(Uri.parse(googleMapsUrl))) {
-        await launchUrl(
-          Uri.parse(googleMapsUrl),
-          mode: LaunchMode.externalApplication,
-        );
-        print('✅ LocationSharingScreen: Opened ${share.senderName}\'s location in web browser');
-        return;
+      // Try Apple Maps (iOS)
+      try {
+        if (await canLaunchUrl(Uri.parse(appleMapsUrl))) {
+          await launchUrl(Uri.parse(appleMapsUrl));
+          print('✅ LocationSharingScreen: Opened ${share.senderName}\'s location in Apple Maps');
+          return;
+        }
+      } catch (e) {
+        print('⚠️ LocationSharingScreen: Apple Maps not available: $e');
       }
       
-      // If both fail, show dialog with manual option
-      _showManualMapDialog(googleMapsUrl, share.senderName);
+      // Try Google Maps web with better formatting
+      try {
+        if (await canLaunchUrl(Uri.parse(googleMapsWebUrl))) {
+          await launchUrl(
+            Uri.parse(googleMapsWebUrl),
+            mode: LaunchMode.externalApplication,
+          );
+          print('✅ LocationSharingScreen: Opened ${share.senderName}\'s location in web browser (Google Maps)');
+          return;
+        }
+      } catch (e) {
+        print('⚠️ LocationSharingScreen: Google Maps web not available: $e');
+      }
+      
+      // Try Google Maps with location name
+      try {
+        if (await canLaunchUrl(Uri.parse(googleMapsWithName))) {
+          await launchUrl(
+            Uri.parse(googleMapsWithName),
+            mode: LaunchMode.externalApplication,
+          );
+          print('✅ LocationSharingScreen: Opened ${share.senderName}\'s location in web browser (with location name)');
+          return;
+        }
+      } catch (e) {
+        print('⚠️ LocationSharingScreen: Google Maps with name not available: $e');
+      }
+      
+      // If all fail, show dialog with manual option
+      _showManualMapDialog(googleMapsWebUrl, share.senderName);
       
     } catch (e) {
-      print('❌ LocationSharingScreen: Failed to open Google Maps: $e');
-      _showManualMapDialog('https://www.google.com/maps?q=${share.latitude},${share.longitude}', share.senderName);
+      print('❌ LocationSharingScreen: Failed to open any maps app: $e');
+      _showManualMapDialog('https://www.google.com/maps/search/?api=1&query=${share.latitude},${share.longitude}', share.senderName);
     }
   }
 
   Future<void> _openUserLocationInGoogleMaps(UserLocation user) async {
     try {
-      // Try to open in Google Maps app first
-      final googleMapsUrl = 'https://www.google.com/maps?q=${user.latitude},${user.longitude}';
-      final googleMapsAppUrl = 'comgooglemaps://?q=${user.latitude},${user.longitude}';
+      print('🗺️ LocationSharingScreen: Opening ${user.name}\'s location in maps...');
       
-      // Try to launch Google Maps app
-      if (await canLaunchUrl(Uri.parse(googleMapsAppUrl))) {
-        await launchUrl(Uri.parse(googleMapsAppUrl));
-        print('✅ LocationSharingScreen: Opened ${user.name}\'s location in Google Maps app');
-        return;
+      // Try different URL schemes for better compatibility
+      final coordinates = '${user.latitude},${user.longitude}';
+      final locationName = user.name.replaceAll(' ', '+');
+      
+      // 1. Try Google Maps app with coordinates
+      final googleMapsAppUrl = 'comgooglemaps://?q=$coordinates&center=$coordinates&zoom=15';
+      
+      // 2. Try Apple Maps (iOS)
+      final appleMapsUrl = 'http://maps.apple.com/?q=$coordinates&ll=$coordinates&z=15';
+      
+      // 3. Try Google Maps web with better formatting
+      final googleMapsWebUrl = 'https://www.google.com/maps/search/?api=1&query=$coordinates&zoom=15';
+      
+      // 4. Try Google Maps with location name
+      final googleMapsWithName = 'https://www.google.com/maps/search/?api=1&query=$locationName+$coordinates';
+      
+      // Try Google Maps app first
+      try {
+        if (await canLaunchUrl(Uri.parse(googleMapsAppUrl))) {
+          await launchUrl(Uri.parse(googleMapsAppUrl));
+          print('✅ LocationSharingScreen: Opened ${user.name}\'s location in Google Maps app');
+          return;
+        }
+      } catch (e) {
+        print('⚠️ LocationSharingScreen: Google Maps app not available: $e');
       }
       
-      // Fallback to web browser
-      if (await canLaunchUrl(Uri.parse(googleMapsUrl))) {
-        await launchUrl(
-          Uri.parse(googleMapsUrl),
-          mode: LaunchMode.externalApplication,
-        );
-        print('✅ LocationSharingScreen: Opened ${user.name}\'s location in web browser');
-        return;
+      // Try Apple Maps (iOS)
+      try {
+        if (await canLaunchUrl(Uri.parse(appleMapsUrl))) {
+          await launchUrl(Uri.parse(appleMapsUrl));
+          print('✅ LocationSharingScreen: Opened ${user.name}\'s location in Apple Maps');
+          return;
+        }
+      } catch (e) {
+        print('⚠️ LocationSharingScreen: Apple Maps not available: $e');
       }
       
-      // If both fail, show dialog with manual option
-      _showManualMapDialog(googleMapsUrl, user.name);
+      // Try Google Maps web with better formatting
+      try {
+        if (await canLaunchUrl(Uri.parse(googleMapsWebUrl))) {
+          await launchUrl(
+            Uri.parse(googleMapsWebUrl),
+            mode: LaunchMode.externalApplication,
+          );
+          print('✅ LocationSharingScreen: Opened ${user.name}\'s location in web browser (Google Maps)');
+          return;
+        }
+      } catch (e) {
+        print('⚠️ LocationSharingScreen: Google Maps web not available: $e');
+      }
+      
+      // Try Google Maps with location name
+      try {
+        if (await canLaunchUrl(Uri.parse(googleMapsWithName))) {
+          await launchUrl(
+            Uri.parse(googleMapsWithName),
+            mode: LaunchMode.externalApplication,
+          );
+          print('✅ LocationSharingScreen: Opened ${user.name}\'s location in web browser (with location name)');
+          return;
+        }
+      } catch (e) {
+        print('⚠️ LocationSharingScreen: Google Maps with name not available: $e');
+      }
+      
+      // If all fail, show dialog with manual option
+      _showManualMapDialog(googleMapsWebUrl, user.name);
       
     } catch (e) {
-      print('❌ LocationSharingScreen: Failed to open Google Maps: $e');
-      _showManualMapDialog('https://www.google.com/maps?q=${user.latitude},${user.longitude}', user.name);
+      print('❌ LocationSharingScreen: Failed to open any maps app: $e');
+      _showManualMapDialog('https://www.google.com/maps/search/?api=1&query=${user.latitude},${user.longitude}', user.name);
     }
   }
 

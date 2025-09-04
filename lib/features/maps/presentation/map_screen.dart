@@ -149,33 +149,80 @@ class _MapScreenState extends State<MapScreen> {
 
   Future<void> _openInGoogleMaps() async {
     try {
-      // Try to open in Google Maps app first
-      final googleMapsUrl = 'https://www.google.com/maps?q=${widget.latitude},${widget.longitude}';
-      final googleMapsAppUrl = 'comgooglemaps://?q=${widget.latitude},${widget.longitude}';
+      print('🗺️ MapScreen: Attempting to open location in Google Maps...');
       
-      // Try to launch Google Maps app
-      if (await canLaunchUrl(Uri.parse(googleMapsAppUrl))) {
-        await launchUrl(Uri.parse(googleMapsAppUrl));
-        print('✅ MapScreen: Opened in Google Maps app');
-        return;
+      // Try different URL schemes for better compatibility
+      final coordinates = '${widget.latitude},${widget.longitude}';
+      final locationName = widget.senderName.replaceAll(' ', '+');
+      
+      // 1. Try Google Maps app with coordinates
+      final googleMapsAppUrl = 'comgooglemaps://?q=$coordinates&center=$coordinates&zoom=15';
+      
+      // 2. Try Apple Maps (iOS)
+      final appleMapsUrl = 'http://maps.apple.com/?q=$coordinates&ll=$coordinates&z=15';
+      
+      // 3. Try Google Maps web with better formatting
+      final googleMapsWebUrl = 'https://www.google.com/maps/search/?api=1&query=$coordinates&zoom=15';
+      
+      // 4. Try Google Maps with location name
+      final googleMapsWithName = 'https://www.google.com/maps/search/?api=1&query=$locationName+$coordinates';
+      
+      // Try Google Maps app first
+      try {
+        if (await canLaunchUrl(Uri.parse(googleMapsAppUrl))) {
+          await launchUrl(Uri.parse(googleMapsAppUrl));
+          print('✅ MapScreen: Opened in Google Maps app');
+          return;
+        }
+      } catch (e) {
+        print('⚠️ MapScreen: Google Maps app not available: $e');
       }
       
-      // Fallback to web browser
-      if (await canLaunchUrl(Uri.parse(googleMapsUrl))) {
-        await launchUrl(
-          Uri.parse(googleMapsUrl),
-          mode: LaunchMode.externalApplication,
-        );
-        print('✅ MapScreen: Opened in web browser');
-        return;
+      // Try Apple Maps (iOS)
+      try {
+        if (await canLaunchUrl(Uri.parse(appleMapsUrl))) {
+          await launchUrl(Uri.parse(appleMapsUrl));
+          print('✅ MapScreen: Opened in Apple Maps');
+          return;
+        }
+      } catch (e) {
+        print('⚠️ MapScreen: Apple Maps not available: $e');
       }
       
-      // If both fail, show dialog with manual option
-      _showManualMapDialog(googleMapsUrl);
+      // Try Google Maps web with better formatting
+      try {
+        if (await canLaunchUrl(Uri.parse(googleMapsWebUrl))) {
+          await launchUrl(
+            Uri.parse(googleMapsWebUrl),
+            mode: LaunchMode.externalApplication,
+          );
+          print('✅ MapScreen: Opened in web browser (Google Maps)');
+          return;
+        }
+      } catch (e) {
+        print('⚠️ MapScreen: Google Maps web not available: $e');
+      }
+      
+      // Try Google Maps with location name
+      try {
+        if (await canLaunchUrl(Uri.parse(googleMapsWithName))) {
+          await launchUrl(
+            Uri.parse(googleMapsWithName),
+            mode: LaunchMode.externalApplication,
+          );
+          print('✅ MapScreen: Opened in web browser (with location name)');
+          return;
+        }
+      } catch (e) {
+        print('⚠️ MapScreen: Google Maps with name not available: $e');
+      }
+      
+      // If all fail, show dialog with manual option
+      _showManualMapDialog(googleMapsWebUrl);
       
     } catch (e) {
-      print('❌ MapScreen: Failed to open Google Maps: $e');
-      _showManualMapDialog('https://www.google.com/maps?q=${widget.latitude},${widget.longitude}');
+      print('❌ MapScreen: Failed to open any maps app: $e');
+      _showManualMapDialog('https://www.google.com/maps/search/?api=1&query=${widget.latitude},${widget.longitude}');
     }
   }
 
@@ -194,7 +241,23 @@ class _MapScreenState extends State<MapScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Unable to open Google Maps automatically. Please copy the link below:'),
+            const Text('Maps app not found. You can:'),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(Icons.download, color: Colors.blue.shade600, size: 20),
+                const SizedBox(width: 8),
+                const Text('Install Google Maps or Apple Maps'),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Icon(Icons.open_in_browser, color: Colors.green.shade600, size: 20),
+                const SizedBox(width: 8),
+                const Text('Open in web browser'),
+              ],
+            ),
             const SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.all(12),
@@ -228,16 +291,30 @@ class _MapScreenState extends State<MapScreen> {
             child: const Text('Close'),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.of(context).pop();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('URL copied to clipboard. Please paste it in a new tab.'),
-                  duration: Duration(seconds: 3),
-                ),
-              );
+              // Try to open in web browser as fallback
+              try {
+                if (await canLaunchUrl(Uri.parse(url))) {
+                  await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Unable to open maps. Please install a maps app.'),
+                      backgroundColor: Colors.orange,
+                    ),
+                  );
+                }
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Unable to open maps. Please install a maps app.'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
             },
-            child: const Text('Copy URL'),
+            child: const Text('Open in Browser'),
           ),
         ],
       ),
