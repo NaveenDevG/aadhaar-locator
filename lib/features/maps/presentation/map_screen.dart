@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class MapScreen extends StatefulWidget {
   final String senderName;
@@ -146,9 +147,39 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
-  void _openInGoogleMaps() {
-    final url = 'https://www.google.com/maps?q=${widget.latitude},${widget.longitude}';
-    
+  Future<void> _openInGoogleMaps() async {
+    try {
+      // Try to open in Google Maps app first
+      final googleMapsUrl = 'https://www.google.com/maps?q=${widget.latitude},${widget.longitude}';
+      final googleMapsAppUrl = 'comgooglemaps://?q=${widget.latitude},${widget.longitude}';
+      
+      // Try to launch Google Maps app
+      if (await canLaunchUrl(Uri.parse(googleMapsAppUrl))) {
+        await launchUrl(Uri.parse(googleMapsAppUrl));
+        print('✅ MapScreen: Opened in Google Maps app');
+        return;
+      }
+      
+      // Fallback to web browser
+      if (await canLaunchUrl(Uri.parse(googleMapsUrl))) {
+        await launchUrl(
+          Uri.parse(googleMapsUrl),
+          mode: LaunchMode.externalApplication,
+        );
+        print('✅ MapScreen: Opened in web browser');
+        return;
+      }
+      
+      // If both fail, show dialog with manual option
+      _showManualMapDialog(googleMapsUrl);
+      
+    } catch (e) {
+      print('❌ MapScreen: Failed to open Google Maps: $e');
+      _showManualMapDialog('https://www.google.com/maps?q=${widget.latitude},${widget.longitude}');
+    }
+  }
+
+  void _showManualMapDialog(String url) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -163,7 +194,7 @@ class _MapScreenState extends State<MapScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Click the link below to open this location in Google Maps:'),
+            const Text('Unable to open Google Maps automatically. Please copy the link below:'),
             const SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.all(12),

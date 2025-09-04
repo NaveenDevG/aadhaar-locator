@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/routing/app_router.dart';
 import '../providers/location_sharing_providers.dart';
 import '../models/location_share.dart';
@@ -29,6 +30,9 @@ class _LocationSharingScreenState extends ConsumerState<LocationSharingScreen>
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     
+    // Listen to tab changes to auto-send notifications
+    _tabController.addListener(_onTabChanged);
+    
     // Refresh logged-in users when screen loads
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(locationSharingControllerProvider.notifier).refreshLoggedInUsers();
@@ -52,6 +56,78 @@ class _LocationSharingScreenState extends ConsumerState<LocationSharingScreen>
   void dispose() {
     _tabController.dispose();
     super.dispose();
+  }
+
+  /// Handle tab changes - auto-send notification when share tab is selected
+  void _onTabChanged() {
+    if (_tabController.index == 0) { // Share tab (index 0)
+      print('📍 LocationSharingScreen: Share tab selected - auto-sending notification to all users');
+      _autoSendNotificationToAllUsers();
+    }
+  }
+
+  /// Automatically send notification to all users when share tab is clicked
+  Future<void> _autoSendNotificationToAllUsers() async {
+    try {
+      print('📢 LocationSharingScreen: Auto-sending notification to all users...');
+      
+      // Get all logged-in users
+      final allUsers = await ref.read(locationSharingServiceProvider).getLoggedInUsers();
+      
+      if (allUsers.isEmpty) {
+        print('ℹ️ LocationSharingScreen: No other users online to notify');
+        return;
+      }
+      
+      print('📢 LocationSharingScreen: Found ${allUsers.length} online users for auto-notification');
+      
+      // Get users with FCM tokens
+      final usersWithTokens = allUsers.where((user) => user.fcmToken != null).toList();
+      
+      if (usersWithTokens.isEmpty) {
+        print('⚠️ LocationSharingScreen: No users have FCM tokens for auto-notification');
+        return;
+      }
+      
+      // Get current user info
+      final currentUser = ref.read(authControllerProvider).profile;
+      final userName = currentUser?.name ?? currentUser?.email ?? 'Unknown User';
+      
+      // Send auto-notification to all users
+      final fcmTokens = usersWithTokens.map((user) => user.fcmToken!).toList();
+      final result = await BackendFCMService.sendNotificationToMultipleUsers(
+        fcmTokens: fcmTokens,
+        title: '📍 $userName is sharing location',
+        body: 'Tap to view their current location',
+        data: {
+          'type': 'location_share_auto',
+          'senderName': userName,
+          'senderUid': currentUser?.uid ?? '',
+          'timestamp': DateTime.now().toIso8601String(),
+        },
+      );
+      
+      if (result['success'] == true) {
+        final successCount = result['successCount'] ?? 0;
+        print('✅ LocationSharingScreen: Auto-notification sent to $successCount users');
+        
+        // Show local confirmation
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('📢 Notification sent to $successCount users'),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      } else {
+        print('❌ LocationSharingScreen: Auto-notification failed: ${result['error']}');
+      }
+      
+    } catch (e) {
+      print('❌ LocationSharingScreen: Auto-notification failed: $e');
+    }
   }
 
   Future<void> _testNotification() async {
@@ -406,6 +482,135 @@ class _LocationSharingScreenState extends ConsumerState<LocationSharingScreen>
         'lat': share.latitude,
         'lng': share.longitude,
       },
+    );
+  }
+
+  Future<void> _openInGoogleMaps(LocationShare share) async {
+    try {
+      // Try to open in Google Maps app first
+      final googleMapsUrl = 'https://www.google.com/maps?q=${share.latitude},${share.longitude}';
+      final googleMapsAppUrl = 'comgooglemaps://?q=${share.latitude},${share.longitude}';
+      
+      // Try to launch Google Maps app
+      if (await canLaunchUrl(Uri.parse(googleMapsAppUrl))) {
+        await launchUrl(Uri.parse(googleMapsAppUrl));
+        print('✅ LocationSharingScreen: Opened ${share.senderName}\'s location in Google Maps app');
+        return;
+      }
+      
+      // Fallback to web browser
+      if (await canLaunchUrl(Uri.parse(googleMapsUrl))) {
+        await launchUrl(
+          Uri.parse(googleMapsUrl),
+          mode: LaunchMode.externalApplication,
+        );
+        print('✅ LocationSharingScreen: Opened ${share.senderName}\'s location in web browser');
+        return;
+      }
+      
+      // If both fail, show dialog with manual option
+      _showManualMapDialog(googleMapsUrl, share.senderName);
+      
+    } catch (e) {
+      print('❌ LocationSharingScreen: Failed to open Google Maps: $e');
+      _showManualMapDialog('https://www.google.com/maps?q=${share.latitude},${share.longitude}', share.senderName);
+    }
+  }
+
+  Future<void> _openUserLocationInGoogleMaps(UserLocation user) async {
+    try {
+      // Try to open in Google Maps app first
+      final googleMapsUrl = 'https://www.google.com/maps?q=${user.latitude},${user.longitude}';
+      final googleMapsAppUrl = 'comgooglemaps://?q=${user.latitude},${user.longitude}';
+      
+      // Try to launch Google Maps app
+      if (await canLaunchUrl(Uri.parse(googleMapsAppUrl))) {
+        await launchUrl(Uri.parse(googleMapsAppUrl));
+        print('✅ LocationSharingScreen: Opened ${user.name}\'s location in Google Maps app');
+        return;
+      }
+      
+      // Fallback to web browser
+      if (await canLaunchUrl(Uri.parse(googleMapsUrl))) {
+        await launchUrl(
+          Uri.parse(googleMapsUrl),
+          mode: LaunchMode.externalApplication,
+        );
+        print('✅ LocationSharingScreen: Opened ${user.name}\'s location in web browser');
+        return;
+      }
+      
+      // If both fail, show dialog with manual option
+      _showManualMapDialog(googleMapsUrl, user.name);
+      
+    } catch (e) {
+      print('❌ LocationSharingScreen: Failed to open Google Maps: $e');
+      _showManualMapDialog('https://www.google.com/maps?q=${user.latitude},${user.longitude}', user.name);
+    }
+  }
+
+  void _showManualMapDialog(String url, String senderName) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.map, color: Colors.blue.shade600),
+            const SizedBox(width: 8),
+            Text('$senderName\'s Location'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Unable to open Google Maps automatically. Please copy the link below:'),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue.shade200),
+              ),
+              child: SelectableText(
+                url,
+                style: const TextStyle(
+                  color: Colors.blue,
+                  decoration: TextDecoration.underline,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Coordinates: ${url.split('q=')[1]}',
+              style: TextStyle(
+                color: Colors.grey.shade600,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('URL copied to clipboard. Please paste it in a new tab.'),
+                  duration: Duration(seconds: 3),
+                ),
+              );
+            },
+            child: const Text('Copy URL'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1114,10 +1319,20 @@ class _LocationSharingScreenState extends ConsumerState<LocationSharingScreen>
             ),
           ],
         ),
-        trailing: IconButton(
-          icon: const Icon(Icons.map),
-          onPressed: () => _viewLocationOnMap(share),
-          tooltip: 'View on Map',
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.map),
+              onPressed: () => _viewLocationOnMap(share),
+              tooltip: 'View on Map',
+            ),
+            IconButton(
+              icon: const Icon(Icons.open_in_new),
+              onPressed: () => _openInGoogleMaps(share),
+              tooltip: 'Open in Google Maps',
+            ),
+          ],
         ),
         onTap: () => _viewLocationOnMap(share),
       ),
@@ -1150,17 +1365,27 @@ class _LocationSharingScreenState extends ConsumerState<LocationSharingScreen>
           ],
         ),
         trailing: user.hasLocation
-            ? IconButton(
-                icon: const Icon(Icons.map),
-                onPressed: () => Navigator.of(context).pushNamed(
-                  AppRouter.map,
-                  arguments: {
-                    'senderName': user.name,
-                    'lat': user.latitude!,
-                    'lng': user.longitude!,
-                  },
-                ),
-                tooltip: 'View Location',
+            ? Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.map),
+                    onPressed: () => Navigator.of(context).pushNamed(
+                      AppRouter.map,
+                      arguments: {
+                        'senderName': user.name,
+                        'lat': user.latitude!,
+                        'lng': user.longitude!,
+                      },
+                    ),
+                    tooltip: 'View Location',
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.open_in_new),
+                    onPressed: () => _openUserLocationInGoogleMaps(user),
+                    tooltip: 'Open in Google Maps',
+                  ),
+                ],
               )
             : null,
       ),

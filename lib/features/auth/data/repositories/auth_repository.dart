@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../../../core/errors/app_exception.dart';
 import '../../../../core/config/app_config.dart';
+import '../../../notifications/services/fcm_service.dart';
 
 class AuthRepository {
   final FirebaseAuth _auth;
@@ -16,10 +17,22 @@ class AuthRepository {
     required String password,
   }) async {
     try {
-      return await _auth.createUserWithEmailAndPassword(
+      final result = await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
+      
+      // Generate FCM token after successful registration
+      try {
+        print('🔔 AuthRepository: Generating FCM token for new user...');
+        await FCMService.updateTokenForUser(result.user!.uid);
+        print('✅ AuthRepository: FCM token generated successfully');
+      } catch (e) {
+        print('⚠️ AuthRepository: Failed to generate FCM token: $e');
+        // Don't fail registration if FCM token generation fails
+      }
+      
+      return result;
     } on FirebaseAuthException catch (e) {
       throw AuthException(
         _getAuthErrorMessage(e.code),
@@ -56,6 +69,17 @@ class AuthRepository {
           );
           
           print('✅ AuthRepository: Login successful for $email');
+          
+          // Generate FCM token after successful login
+          try {
+            print('🔔 AuthRepository: Generating FCM token for logged-in user...');
+            await FCMService.updateTokenForUser(result.user!.uid);
+            print('✅ AuthRepository: FCM token generated successfully');
+          } catch (e) {
+            print('⚠️ AuthRepository: Failed to generate FCM token: $e');
+            // Don't fail login if FCM token generation fails
+          }
+          
           return result;
         } on FirebaseAuthException catch (e) {
           print('❌ AuthRepository: Firebase auth error: ${e.code} - ${e.message}');
