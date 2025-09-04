@@ -143,7 +143,10 @@ class DashboardScreen extends ConsumerWidget {
                   Icons.location_on,
                   Colors.blue,
                   () {
-                    Navigator.of(context).pushNamed(AppRouter.locationSharing);
+                    Navigator.of(context).pushNamed(
+                      AppRouter.locationSharing,
+                      arguments: {'autoShare': true},
+                    );
                   },
                 ),
                 _buildActionCard(

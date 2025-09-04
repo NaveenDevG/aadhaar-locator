@@ -29,7 +29,12 @@ class AppRouter {
         longitude: args?['lng'] as double? ?? 0.0,
       );
     },
-    locationSharing: (context) => const LocationSharingScreen(),
+    locationSharing: (context) {
+      final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+      return LocationSharingScreen(
+        autoShare: args?['autoShare'] ?? false,
+      );
+    },
     locationSharingDemo: (context) => const LocationSharingDemo(),
   };
 

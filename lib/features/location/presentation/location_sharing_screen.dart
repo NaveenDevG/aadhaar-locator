@@ -14,7 +14,12 @@ import '../../notifications/services/backend_fcm_service.dart';
 
 
 class LocationSharingScreen extends ConsumerStatefulWidget {
-  const LocationSharingScreen({super.key});
+  final bool autoShare;
+  
+  const LocationSharingScreen({
+    super.key,
+    this.autoShare = false,
+  });
 
   @override
   ConsumerState<LocationSharingScreen> createState() => _LocationSharingScreenState();
@@ -39,6 +44,11 @@ class _LocationSharingScreenState extends ConsumerState<LocationSharingScreen>
       
       // Initialize notification service if not already initialized
       _initializeNotificationService();
+      
+      // Auto-share location if requested from quick action
+      if (widget.autoShare) {
+        _performAutoShare();
+      }
     });
   }
 
@@ -63,6 +73,40 @@ class _LocationSharingScreenState extends ConsumerState<LocationSharingScreen>
     if (_tabController.index == 0) { // Share tab (index 0)
       print('📍 LocationSharingScreen: Share tab selected - auto-sending notification to all users');
       _autoSendNotificationToAllUsers();
+    }
+  }
+
+  /// Perform automatic location sharing when coming from quick action
+  Future<void> _performAutoShare() async {
+    try {
+      print('📍 LocationSharingScreen: Performing auto-share from quick action...');
+      
+      // Show loading indicator
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('📍 Sharing your location automatically...'),
+            backgroundColor: Colors.blue,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+      
+      // Perform the same location sharing as the manual button
+      await _shareLocation();
+      
+    } catch (e) {
+      print('❌ LocationSharingScreen: Auto-share failed: $e');
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Auto-share failed: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
     }
   }
 
@@ -598,9 +642,9 @@ class _LocationSharingScreenState extends ConsumerState<LocationSharingScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Share Your Location',
-                    style: TextStyle(
+                  Text(
+                    widget.autoShare ? 'Auto-Sharing Your Location' : 'Share Your Location',
+                    style: const TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
                     ),
@@ -619,7 +663,9 @@ class _LocationSharingScreenState extends ConsumerState<LocationSharingScreen>
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            '📍 Location will be automatically shared with ALL logged-in users',
+                            widget.autoShare 
+                                ? '📍 Location is being automatically shared with ALL logged-in users'
+                                : '📍 Location will be automatically shared with ALL logged-in users',
                             style: TextStyle(
                               color: Colors.blue.shade700,
                               fontWeight: FontWeight.w500,
@@ -704,34 +750,80 @@ class _LocationSharingScreenState extends ConsumerState<LocationSharingScreen>
                   ),
                   
                   const SizedBox(height: 16),
-                  ElevatedButton.icon(
-                    onPressed: state.isSharing ? null : _shareLocation,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
-                      shape: RoundedRectangleBorder(
+                  if (!widget.autoShare) ...[
+                    ElevatedButton.icon(
+                      onPressed: state.isSharing ? null : _shareLocation,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      icon: state.isSharing
+                          ? const SizedBox(
+                              height: 24,
+                              width: 24,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : const Icon(Icons.location_on, size: 24),
+                      label: Text(
+                        state.isSharing ? 'Sharing Location...' : '📍 Share Location Now',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ] else ...[
+                    // Show auto-sharing status when coming from quick action
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.green.shade50,
                         borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.green.shade200),
                       ),
-                    ),
-                    icon: state.isSharing
-                        ? const SizedBox(
-                            height: 24,
-                            width: 24,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      child: Row(
+                        children: [
+                          if (state.isSharing) ...[
+                            const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
+                              ),
                             ),
-                          )
-                        : const Icon(Icons.location_on, size: 24),
-                    label: Text(
-                      state.isSharing ? 'Sharing Location...' : '📍 Share Location Now',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
+                            const SizedBox(width: 12),
+                            const Text(
+                              '📍 Auto-sharing your location...',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green,
+                              ),
+                            ),
+                          ] else ...[
+                            const Icon(Icons.check_circle, color: Colors.green, size: 24),
+                            const SizedBox(width: 12),
+                            const Text(
+                              '✅ Location shared successfully!',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green,
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),
