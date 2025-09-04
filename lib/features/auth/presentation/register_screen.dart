@@ -142,52 +142,6 @@ This is common in Android emulators. Try:
     }
   }
 
-  Future<void> _checkConnectivity() async {
-    try {
-      final connectivityService = FirebaseConnectivityService();
-      final status = await connectivityService.getConnectivityStatus();
-      
-      if (!mounted) return;
-      
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Firebase Connectivity Status'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Connected: ${status['isConnected'] ? '✅ Yes' : '❌ No'}'),
-              const SizedBox(height: 8),
-              if (status['lastError'] != null) ...[
-                Text('Last Error: ${status['lastError']}'),
-                const SizedBox(height: 8),
-              ],
-              if (status['recommendations'].isNotEmpty) ...[
-                const Text('Recommendations:', style: TextStyle(fontWeight: FontWeight.bold)),
-                const SizedBox(height: 4),
-                ...status['recommendations'].map((rec) => Text('• $rec')),
-              ],
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('OK'),
-            ),
-          ],
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Connectivity check failed: $e'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -409,17 +363,6 @@ This is common in Android emulators. Try:
                 const SizedBox(height: 16),
               ],
               
-              // Connectivity check button
-              OutlinedButton.icon(
-                onPressed: authState.isLoading ? null : _checkConnectivity,
-                icon: const Icon(Icons.wifi_find),
-                label: const Text('Check Firebase Connection'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.blue,
-                  side: const BorderSide(color: Colors.blue),
-                ),
-              ),
-              const SizedBox(height: 16),
               
               ElevatedButton(
                 onPressed: authState.isLoading ? null : _register,
