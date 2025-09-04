@@ -1,6 +1,6 @@
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import '../../core/config/backend_config.dart';
+import '../../../core/config/backend_config.dart';
 
 class BackendFCMService {
   
@@ -156,7 +156,7 @@ class BackendFCMService {
       print('🔍 BackendFCM: Testing backend connection...');
       
       final response = await http.get(
-        Uri.parse('$_backendUrl/'),
+        Uri.parse(BackendConfig.healthCheckEndpoint),
         headers: {
           'Content-Type': 'application/json',
         },

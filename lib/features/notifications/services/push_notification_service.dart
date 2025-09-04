@@ -3,7 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import '../../core/config/backend_config.dart';
+import '../../../core/config/backend_config.dart';
 import 'fcm_service.dart';
 
 class PushNotificationService {
