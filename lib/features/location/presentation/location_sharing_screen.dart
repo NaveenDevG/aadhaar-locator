@@ -1,0 +1,1215 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
+import '../../../core/routing/app_router.dart';
+import '../providers/location_sharing_providers.dart';
+import '../models/location_share.dart';
+import '../models/user_location.dart';
+import '../services/location_permission_service.dart';
+import '../../auth/providers/auth_providers.dart';
+import '../../notifications/services/notification_service.dart';
+import '../../notifications/services/push_notification_service.dart';
+import '../../notifications/services/backend_fcm_service.dart';
+
+
+class LocationSharingScreen extends ConsumerStatefulWidget {
+  const LocationSharingScreen({super.key});
+
+  @override
+  ConsumerState<LocationSharingScreen> createState() => _LocationSharingScreenState();
+}
+
+class _LocationSharingScreenState extends ConsumerState<LocationSharingScreen>
+    with TickerProviderStateMixin {
+  late TabController _tabController;
+  final _dateFormat = DateFormat('dd/MM/yyyy HH:mm');
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 3, vsync: this);
+    
+    // Refresh logged-in users when screen loads
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(locationSharingControllerProvider.notifier).refreshLoggedInUsers();
+      
+      // Initialize notification service if not already initialized
+      _initializeNotificationService();
+    });
+  }
+
+  Future<void> _initializeNotificationService() async {
+    try {
+      print('🔔 LocationSharingScreen: Initializing notification service...');
+      await NotificationService.initialize();
+      print('✅ LocationSharingScreen: Notification service initialized successfully');
+    } catch (e) {
+      print('❌ LocationSharingScreen: Failed to initialize notification service: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _testNotification() async {
+    try {
+      print('🧪 LocationSharingScreen: Testing notification...');
+      
+      // Test 1: Local notification
+      print('🧪 LocationSharingScreen: Testing local notification...');
+      await NotificationService.showNotification(
+        title: '🧪 Test Local Notification',
+        body: 'This is a test local notification from the location sharing screen',
+        payload: {
+          'type': 'test_local',
+          'timestamp': DateTime.now().toIso8601String(),
+        },
+      );
+      
+      print('✅ LocationSharingScreen: Local notification shown successfully');
+      
+      // Test 2: Check FCM status
+      print('🧪 LocationSharingScreen: Checking FCM status...');
+      final currentUser = ref.read(authControllerProvider).profile;
+      if (currentUser != null) {
+        print('🧪 LocationSharingScreen: Current user: ${currentUser.name} (${currentUser.uid})');
+        
+        // Test 3: Try to send push notification to self (if Cloud Functions are deployed)
+        try {
+          print('🧪 LocationSharingScreen: Testing push notification to self...');
+          final success = await PushNotificationService.sendLocationShareNotification(
+            recipientUid: currentUser.uid,
+            senderName: 'Test User',
+            latitude: 0.0,
+            longitude: 0.0,
+            senderUid: currentUser.uid,
+          );
+          
+          if (success) {
+            print('✅ LocationSharingScreen: Push notification to self successful');
+          } else {
+            print('⚠️ LocationSharingScreen: Push notification to self failed (Cloud Functions not deployed?)');
+          }
+        } catch (e) {
+          print('⚠️ LocationSharingScreen: Push notification test failed: $e');
+        }
+      }
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Test notifications completed! Check console for details.'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      print('❌ LocationSharingScreen: Test notification failed: $e');
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Test notification failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Test sending notification to ALL online users at once
+  Future<void> _testNotificationToAllUsers() async {
+    try {
+      print('🧪 LocationSharingScreen: Testing notification to ALL online users...');
+      
+      // Show loading message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('📢 Sending test notification to ALL online users...'),
+            backgroundColor: Colors.blue,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+      
+      // Call the service method
+      await ref.read(locationSharingServiceProvider).testNotificationToAllUsers();
+      
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('📢 Test notification sent to ALL online users!'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      print('❌ LocationSharingScreen: Test notification to all users failed: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Failed to send to all users: $e'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    }
+  }
+
+  /// Test FCM connection and server key
+  Future<void> _testFCMConnection() async {
+    try {
+      print('🔗 LocationSharingScreen: Testing FCM connection...');
+      
+      // Show loading message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('🔗 Testing FCM connection...'),
+            backgroundColor: Colors.amber,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+      
+      // Test the FCM connection
+      final isConnected = await BackendFCMService.testConnection();
+      
+      if (mounted) {
+        if (isConnected) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('✅ FCM connection successful!'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('❌ FCM connection failed! Check console for details.'),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 5),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('❌ LocationSharingScreen: FCM connection test failed: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ FCM test failed: $e'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _debugCurrentState() async {
+    try {
+      print('🔍 LocationSharingScreen: Starting debug...');
+      
+      // Call the debug method from the service
+      await ref.read(locationSharingServiceProvider).debugCurrentState();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Debug info printed to console. Check logs for details.'),
+            backgroundColor: Colors.blue,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      print('❌ LocationSharingScreen: Debug failed: $e');
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Debug failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _refreshFcmToken() async {
+    try {
+      print('🔄 LocationSharingScreen: Refreshing FCM token...');
+      
+      // Call the refresh method from the service
+      await ref.read(locationSharingServiceProvider).refreshFcmToken();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('FCM token refreshed! Check console for details.'),
+            backgroundColor: Colors.teal,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      print('❌ LocationSharingScreen: FCM token refresh failed: $e');
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('FCM token refresh failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _checkNotificationStatus() async {
+    try {
+      print('ℹ️ LocationSharingScreen: Checking notification status...');
+      
+      // Call the status check method from the service
+      final status = await ref.read(locationSharingServiceProvider).checkNotificationStatus();
+      
+      if (mounted) {
+        // Show status in a dialog
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.info, color: Colors.indigo),
+                SizedBox(width: 8),
+                Text('Notification Status'),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('FCM Available: ${status['fcmAvailable'] ?? 'Unknown'}'),
+                Text('FCM Token: ${status['fcmToken'] ?? 'Unknown'}'),
+                Text('User Logged In: ${status['userLoggedIn'] ?? 'Unknown'}'),
+                if (status['userName'] != null) Text('User Name: ${status['userName']}'),
+                Text('User Has FCM Token: ${status['userHasFcmToken'] ?? 'Unknown'}'),
+                Text('User Is Logged In: ${status['userIsLoggedIn'] ?? 'Unknown'}'),
+                Text('User Document Exists: ${status['userDocumentExists'] ?? 'Unknown'}'),
+                Text('FCM Token Document Exists: ${status['fcmTokenDocumentExists'] ?? 'Unknown'}'),
+                if (status['error'] != null) Text('Error: ${status['error']}', style: const TextStyle(color: Colors.red)),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Close'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      print('❌ LocationSharingScreen: Status check failed: $e');
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Status check failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _shareLocation() async {
+    try {
+      print('📍 LocationSharingScreen: Starting automatic location sharing process...');
+      
+      // Use the enhanced permission service for location sharing
+      final hasPermission = await LocationPermissionService.requestLocationSharingPermission(context);
+      if (!hasPermission) {
+        print('❌ LocationSharingScreen: Location permission denied');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Location permission is required to share your location.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+      
+      print('✅ LocationSharingScreen: Location permission granted, proceeding with automatic sharing...');
+
+      // Get current user info for automatic message
+      final currentUser = ref.read(authControllerProvider).profile;
+      final userName = currentUser?.name ?? currentUser?.email ?? 'Unknown User';
+      
+      // Create automatic message with timestamp
+      final timestamp = DateTime.now();
+      final formattedTime = DateFormat('dd/MM/yyyy HH:mm:ss').format(timestamp);
+      final autoMessage = '📍 $userName shared location at $formattedTime';
+      
+      // Now try to share location automatically
+      await ref.read(locationSharingControllerProvider.notifier).shareLocation(
+        message: autoMessage,
+      );
+      
+      // Show success dialog with user count
+      if (mounted) {
+        _showLocationSharedDialog();
+      }
+    } catch (e) {
+      String errorMessage = e.toString();
+      
+      // Handle specific location errors
+      if (errorMessage.contains('Location services are disabled')) {
+        errorMessage = 'Location services are disabled. Please enable them in your device settings.';
+      } else if (errorMessage.contains('permission denied')) {
+        errorMessage = 'Location permission denied. Please grant location permission.';
+      } else if (errorMessage.contains('timeout')) {
+        errorMessage = 'Location request timed out. Please try again.';
+      } else if (errorMessage.contains('location unavailable')) {
+        errorMessage = 'Location is currently unavailable. Please try again.';
+      }
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to share location: $errorMessage'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    }
+  }
+
+  void _viewLocationOnMap(LocationShare share) {
+    Navigator.of(context).pushNamed(
+      AppRouter.map,
+      arguments: {
+        'senderName': share.senderName,
+        'lat': share.latitude,
+        'lng': share.longitude,
+      },
+    );
+  }
+
+  void _showLocationSharedDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return FutureBuilder<List<UserLocation>>(
+          future: ref.read(loggedInUsersProvider.future),
+          builder: (context, snapshot) {
+            final userCount = snapshot.data?.length ?? 0;
+            
+            return AlertDialog(
+              title: Row(
+                children: [
+                  Icon(Icons.check_circle, color: Colors.green, size: 28),
+                  const SizedBox(width: 12),
+                  const Text('Location Shared!'),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '📍 Your location has been automatically shared!',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.green.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.green.shade200),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.people, color: Colors.green.shade700, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            userCount > 0 
+                                ? 'Sent to $userCount user${userCount == 1 ? '' : 's'}'
+                                : 'No other users online',
+                            style: TextStyle(
+                              color: Colors.green.shade700,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Other users will see your location in their "Received" tab and can view it on the map.',
+                    style: TextStyle(
+                      color: Colors.grey.shade600,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('OK'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showPermissionInfo(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Location Permission Information'),
+          content: const Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'To share your location, the app needs:',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 12),
+              Text('• Location permission granted'),
+              Text('• Location services enabled'),
+              Text('• GPS signal available'),
+              SizedBox(height: 8),
+              Text(
+                'If you encounter issues:',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 8),
+              Text('• Check device location settings'),
+              Text('• Ensure GPS is enabled'),
+              Text('• Grant location permission when prompted'),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final locationState = ref.watch(locationSharingControllerProvider);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Location Sharing'),
+        centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.info),
+            onPressed: () => _showPermissionInfo(context),
+            tooltip: 'Permission Info',
+          ),
+        ],
+        bottom: TabBar(
+          controller: _tabController,
+          tabs: const [
+            Tab(text: 'Share', icon: Icon(Icons.location_on)),
+            Tab(text: 'Received', icon: Icon(Icons.download)),
+            Tab(text: 'Users', icon: Icon(Icons.people)),
+          ],
+        ),
+      ),
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          _buildShareTab(locationState),
+          _buildReceivedTab(locationState),
+          _buildUsersTab(locationState),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildShareTab(LocationSharingState state) {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Permission Status Card
+          Card(
+            color: Colors.blue.shade50,
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.info, color: Colors.blue.shade700),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Location Permission Status',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  FutureBuilder<bool>(
+                    future: LocationPermissionService.hasLocationPermission(),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Row(
+                          children: [
+                            SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                            SizedBox(width: 8),
+                            Text('Checking permissions...'),
+                          ],
+                        );
+                      }
+                      
+                      final hasPermission = snapshot.data ?? false;
+                      return Row(
+                        children: [
+                          Icon(
+                            hasPermission ? Icons.check_circle : Icons.error,
+                            color: hasPermission ? Colors.green : Colors.red,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            hasPermission 
+                                ? 'Location permission granted' 
+                                : 'Location permission required',
+                            style: TextStyle(
+                              color: hasPermission ? Colors.green.shade700 : Colors.red.shade700,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  FutureBuilder<bool>(
+                    future: LocationPermissionService.isLocationServiceEnabled(),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const SizedBox.shrink();
+                      }
+                      
+                      final isEnabled = snapshot.data ?? false;
+                      return Row(
+                        children: [
+                          Icon(
+                            isEnabled ? Icons.check_circle : Icons.error,
+                            color: isEnabled ? Colors.green : Colors.red,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            isEnabled 
+                                ? 'Location services enabled' 
+                                : 'Location services disabled',
+                            style: TextStyle(
+                              color: isEnabled ? Colors.green.shade700 : Colors.red.shade700,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          
+          // Share Location Card
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Share Your Location',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.blue.shade200),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info, color: Colors.blue.shade700, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '📍 Location will be automatically shared with ALL logged-in users',
+                            style: TextStyle(
+                              color: Colors.blue.shade700,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Real-time user count indicator
+                  FutureBuilder<List<UserLocation>>(
+                    future: ref.read(loggedInUsersProvider.future),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Card(
+                          child: Padding(
+                            padding: EdgeInsets.all(16.0),
+                            child: Row(
+                              children: [
+                                SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                ),
+                                SizedBox(width: 12),
+                                Text('Loading user count...'),
+                              ],
+                            ),
+                          ),
+                        );
+                      }
+                      
+                      final users = snapshot.data ?? [];
+                      final userCount = users.length;
+                      
+                      return Card(
+                        color: userCount > 0 ? Colors.green.shade50 : Colors.orange.shade50,
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Row(
+                            children: [
+                              Icon(
+                                userCount > 0 ? Icons.people : Icons.person_off,
+                                color: userCount > 0 ? Colors.green.shade700 : Colors.orange.shade700,
+                                size: 24,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      userCount > 0 
+                                          ? '📍 Location will be shared with $userCount user${userCount == 1 ? '' : 's'}'
+                                          : '⚠️ No other users online',
+                                      style: TextStyle(
+                                        color: userCount > 0 ? Colors.green.shade700 : Colors.orange.shade700,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                    if (userCount > 0) ...[
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'Tap "Share Location Now" to send your current location',
+                                        style: TextStyle(
+                                          color: Colors.green.shade600,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  
+                  const SizedBox(height: 16),
+                  ElevatedButton.icon(
+                    onPressed: state.isSharing ? null : _shareLocation,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    icon: state.isSharing
+                        ? const SizedBox(
+                            height: 24,
+                            width: 24,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : const Icon(Icons.location_on, size: 24),
+                    label: Text(
+                      state.isSharing ? 'Sharing Location...' : '📍 Share Location Now',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: _testNotification,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.orange,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          icon: const Icon(Icons.notifications, size: 20),
+                          label: const Text(
+                            '🧪 Test Notification',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: _testNotificationToAllUsers,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          icon: const Icon(Icons.broadcast_on_personal, size: 20),
+                          label: const Text(
+                            '📢 Test to ALL Users',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: _testFCMConnection,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.amber,
+                            foregroundColor: Colors.black,
+                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          icon: const Icon(Icons.wifi_tethering, size: 20),
+                          label: const Text(
+                            '🔗 Test FCM Connection',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Container(), // Placeholder for balance
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: _debugCurrentState,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.purple,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          icon: const Icon(Icons.bug_report, size: 20),
+                          label: const Text(
+                            '🔍 Debug State',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: _checkNotificationStatus,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.indigo,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 20),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          icon: const Icon(Icons.info, size: 20),
+                          label: const Text(
+                            'ℹ️ Check Status',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: _refreshFcmToken,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.teal,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          icon: const Icon(Icons.refresh, size: 20),
+                          label: const Text(
+                            '🔄 Refresh FCM Token',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: _checkNotificationStatus,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.indigo,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          icon: const Icon(Icons.info, size: 20),
+                          label: const Text(
+                            'ℹ️ Check Status',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Expanded(
+            child: _buildMySharesList(state.myShares),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReceivedTab(LocationSharingState state) {
+    if (state.receivedShares.isEmpty) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.location_off,
+              size: 64,
+              color: Colors.grey,
+            ),
+            SizedBox(height: 16),
+            Text(
+              'No location shares received yet',
+              style: TextStyle(
+                fontSize: 18,
+                color: Colors.grey,
+              ),
+            ),
+            SizedBox(height: 8),
+            Text(
+              'When other users share their location,\nit will appear here',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16.0),
+      itemCount: state.receivedShares.length,
+      itemBuilder: (context, index) {
+        final share = state.receivedShares[index];
+        return _buildLocationShareCard(share, isReceived: true);
+      },
+    );
+  }
+
+  Widget _buildUsersTab(LocationSharingState state) {
+    return FutureBuilder<List<UserLocation>>(
+      future: ref.read(loggedInUsersProvider.future),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasError) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error, size: 64, color: Colors.red),
+                const SizedBox(height: 16),
+                Text('Error: ${snapshot.error}'),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () => ref.read(locationSharingControllerProvider.notifier).refreshLoggedInUsers(),
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          );
+        }
+
+        final users = snapshot.data ?? [];
+        if (users.isEmpty) {
+          return const Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.people_outline, size: 64, color: Colors.grey),
+                SizedBox(height: 16),
+                Text(
+                  'No other users online',
+                  style: TextStyle(fontSize: 18, color: Colors.grey),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(16.0),
+          itemCount: users.length,
+          itemBuilder: (context, index) {
+            final user = users[index];
+            return _buildUserCard(user);
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildLocationShareCard(LocationShare share, {bool isReceived = false}) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12.0),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: isReceived ? Colors.blue : Colors.green,
+          child: Icon(
+            isReceived ? Icons.download : Icons.upload,
+            color: Colors.white,
+          ),
+        ),
+        title: Text(share.senderName),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(share.message),
+            const SizedBox(height: 4),
+            Text(
+              '${share.latitude.toStringAsFixed(6)}, ${share.longitude.toStringAsFixed(6)}',
+              style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+            ),
+            Text(
+              _dateFormat.format(share.timestamp),
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          ],
+        ),
+        trailing: IconButton(
+          icon: const Icon(Icons.map),
+          onPressed: () => _viewLocationOnMap(share),
+          tooltip: 'View on Map',
+        ),
+        onTap: () => _viewLocationOnMap(share),
+      ),
+    );
+  }
+
+  Widget _buildUserCard(UserLocation user) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12.0),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: user.isLoggedIn ? Colors.green : Colors.grey,
+          child: Text(
+            user.name.substring(0, 1).toUpperCase(),
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
+        ),
+        title: Text(user.name),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(user.locationStatus),
+            if (user.hasLocation) ...[
+              const SizedBox(height: 4),
+              Text(
+                '${user.latitude!.toStringAsFixed(6)}, ${user.longitude!.toStringAsFixed(6)}',
+                style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+              ),
+            ],
+          ],
+        ),
+        trailing: user.hasLocation
+            ? IconButton(
+                icon: const Icon(Icons.map),
+                onPressed: () => Navigator.of(context).pushNamed(
+                  AppRouter.map,
+                  arguments: {
+                    'senderName': user.name,
+                    'lat': user.latitude!,
+                    'lng': user.longitude!,
+                  },
+                ),
+                tooltip: 'View Location',
+              )
+            : null,
+      ),
+    );
+  }
+
+  Widget _buildMySharesList(List<LocationShare> shares) {
+    if (shares.isEmpty) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.history, size: 64, color: Colors.grey),
+            SizedBox(height: 16),
+            Text(
+              'No location shares yet',
+              style: TextStyle(fontSize: 18, color: Colors.grey),
+            ),
+            SizedBox(height: 8),
+            Text(
+              'Share your location to see it here',
+              style: TextStyle(color: Colors.grey),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Recent Shares',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Expanded(
+          child: ListView.builder(
+            itemCount: shares.length,
+            itemBuilder: (context, index) {
+              final share = shares[index];
+              return _buildLocationShareCard(share, isReceived: false);
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
