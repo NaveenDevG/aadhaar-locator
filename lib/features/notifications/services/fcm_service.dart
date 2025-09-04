@@ -168,19 +168,26 @@ class FCMService {
       print('📍 Coordinates: $latitude, $longitude');
       print('👤 Sender: $senderName');
       
-      final coordinates = '$latitude,$longitude';
+      // Format coordinates with proper precision
+      final latFormatted = latitude.toStringAsFixed(6);
+      final lngFormatted = longitude.toStringAsFixed(6);
+      final coordinates = '$latFormatted,$lngFormatted';
       final locationName = senderName.replaceAll(' ', '+');
       
       // Try different Google Maps URLs in order of preference
       final urls = [
-        // Google Maps app (Android/iOS)
+        // Google Maps app (Android/iOS) - Use proper format for location display
         'comgooglemaps://?q=$coordinates&center=$coordinates&zoom=15',
-        // Apple Maps (iOS)
+        // Google Maps app alternative format
+        'comgooglemaps://?center=$coordinates&zoom=15',
+        // Apple Maps (iOS) - Use proper format for location display
         'http://maps.apple.com/?q=$coordinates&ll=$coordinates&z=15',
-        // Google Maps web with location name
-        'https://www.google.com/maps/search/?api=1&query=$locationName+$coordinates&zoom=15',
-        // Google Maps web with coordinates only
-        'https://www.google.com/maps/search/?api=1&query=$coordinates&zoom=15',
+        // Google Maps web - Use place format for better location display
+        'https://www.google.com/maps/place/$coordinates/@$coordinates,15z',
+        // Google Maps web - Alternative format with search
+        'https://www.google.com/maps/search/?api=1&query=$coordinates',
+        // Google Maps web - Fallback with location name
+        'https://www.google.com/maps/search/?api=1&query=$locationName+$coordinates',
       ];
       
       bool opened = false;
