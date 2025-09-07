@@ -18,19 +18,49 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
+  <meta name="description" content="Rakshak - Secure Location Sharing App">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="aadhaar_locator">
+  <meta name="apple-mobile-web-app-title" content="Rakshak">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
-  <title>aadhaar_locator</title>
+  <title>Rakshak</title>
   <link rel="manifest" href="manifest.json">
+  
+  <!-- Custom launch screen styling -->
+  <style>
+    body {
+      background: linear-gradient(135deg, #FF6B35 0%, #E55A2B 100%);
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    
+    .loading-container {
+      text-align: center;
+      color: white;
+    }
+    
+    .app-name {
+      font-size: 32px;
+      font-weight: bold;
+      margin-bottom: 16px;
+    }
+    
+    .loading-text {
+      font-size: 14px;
+      opacity: 0.8;
+    }
+  </style>
   
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
@@ -40,6 +70,10 @@
   <script src="firebase-config.js"></script>
 </head>
 <body>
+  <div class="loading-container">
+    <div class="app-name">Rakshak</div>
+    <div class="loading-text">Loading...</div>
+  </div>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

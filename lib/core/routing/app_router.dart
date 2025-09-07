@@ -6,6 +6,7 @@ import '../../features/dashboard/presentation/dashboard_screen.dart';
 import '../../features/maps/presentation/map_screen.dart';
 import '../../features/location/presentation/location_sharing_screen.dart';
 import '../../features/location/presentation/location_sharing_demo.dart';
+import '../../features/profile/presentation/profile_screen.dart';
 
 class AppRouter {
   static const String splash = '/';
@@ -15,6 +16,7 @@ class AppRouter {
   static const String map = '/map';
   static const String locationSharing = '/location-sharing';
   static const String locationSharingDemo = '/location-sharing-demo';
+  static const String profile = '/profile';
 
   static Map<String, WidgetBuilder> get routes => {
     splash: (context) => const SplashScreen(),
@@ -36,6 +38,7 @@ class AppRouter {
       );
     },
     locationSharingDemo: (context) => const LocationSharingDemo(),
+    profile: (context) => const ProfileScreen(),
   };
 
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {

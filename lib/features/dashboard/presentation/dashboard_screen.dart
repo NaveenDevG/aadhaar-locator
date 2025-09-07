@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/routing/app_router.dart';
+import '../../../core/widgets/animated_logo.dart';
+import '../../../core/widgets/powered_by_branding.dart';
 import '../../auth/providers/auth_providers.dart';
 import '../../location/providers/location_sharing_providers.dart';
 
@@ -14,13 +16,31 @@ class DashboardScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Dashboard'),
+        title: Row(
+          children: [
+            AnimatedLogo(
+              size: 32.0,
+              showText: false,
+              autoAnimate: true,
+            ),
+            const SizedBox(width: 12),
+            const Text('Dashboard'),
+          ],
+        ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.person),
+            onPressed: () {
+              Navigator.of(context).pushNamed(AppRouter.profile);
+            },
+            tooltip: 'View Profile',
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {
               await ref.read(authControllerProvider.notifier).logout();
             },
+            tooltip: 'Logout',
           ),
         ],
       ),
@@ -29,6 +49,18 @@ class DashboardScreen extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // App Logo Section
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 20.0),
+                child: AnimatedLogo(
+                  size: 100.0,
+                  showText: true,
+                  autoAnimate: true,
+                ),
+              ),
+            ),
+            
             // Welcome Section
             Card(
               child: Padding(
@@ -173,17 +205,22 @@ class DashboardScreen extends ConsumerWidget {
                 ),
                 _buildActionCard(
                   context,
-                              'Profile',
+                  'Profile',
                   Icons.person,
                   Colors.purple,
                   () {
-                    // TODO: Implement profile
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Profile coming soon!')),
-                    );
+                    Navigator.of(context).pushNamed(AppRouter.profile);
                   },
                 ),
               ],
+            ),
+            const SizedBox(height: 32),
+            
+            // Powered by branding
+            const PoweredByBranding(
+              textColor: Colors.grey,
+              textSize: 12.0,
+              imageHeight: 18.0,
             ),
           ],
         ),

@@ -1,6 +1,6 @@
 {
-    "name": "aadhaar_locator",
-    "short_name": "aadhaar_locator",
+    "name": "Rakshak",
+    "short_name": "Rakshak",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

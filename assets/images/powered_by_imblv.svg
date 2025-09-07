@@ -1,0 +1,31 @@
+<svg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+  <!-- Outer ring with accents -->
+  <circle cx="30" cy="30" r="28" fill="none" stroke="#666" stroke-width="2"/>
+  
+  <!-- Orange accent lines -->
+  <path d="M 45 15 Q 50 20 45 25" stroke="#FF6B35" stroke-width="2" fill="none"/>
+  <path d="M 15 35 Q 10 40 15 45" stroke="#FF6B35" stroke-width="2" fill="none"/>
+  
+  <!-- Metallic gradient background -->
+  <defs>
+    <radialGradient id="metallic" cx="0.3" cy="0.3" r="0.8">
+      <stop offset="0%" style="stop-color:#E8E8E8;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#D0D0D0;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#B8B8B8;stop-opacity:1" />
+    </radialGradient>
+  </defs>
+  
+  <!-- Main circular background -->
+  <circle cx="30" cy="30" r="22" fill="url(#metallic)"/>
+  
+  <!-- Red underline bar -->
+  <rect x="18" y="32" width="16" height="2" fill="#E55A2B" rx="1"/>
+  
+  <!-- Text "imlv" with colors -->
+  <text x="20" y="28" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#FF6B35">i</text>
+  <circle cx="22" cy="20" r="1.5" fill="#E55A2B"/>
+  <text x="24" y="28" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#E55A2B">m</text>
+  <text x="30" y="28" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#FF6B35">l</text>
+  <text x="35" y="28" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#E55A2B">v</text>
+</svg>
+

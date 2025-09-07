@@ -81,7 +81,7 @@ class MyApp extends ConsumerWidget {
     final authState = ref.watch(authControllerProvider);
     
     return MaterialApp(
-      title: 'Aadhaar Locator',
+      title: 'Rakshak',
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: ThemeMode.system,

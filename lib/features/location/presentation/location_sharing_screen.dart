@@ -11,6 +11,8 @@ import '../../auth/providers/auth_providers.dart';
 import '../../notifications/services/notification_service.dart';
 import '../../notifications/services/push_notification_service.dart';
 import '../../notifications/services/backend_fcm_service.dart';
+import '../../notifications/services/range_notification_service.dart';
+import '../../../core/services/location_range_service.dart';
 
 
 class LocationSharingScreen extends ConsumerStatefulWidget {
@@ -33,7 +35,7 @@ class _LocationSharingScreenState extends ConsumerState<LocationSharingScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 2, vsync: this);
     
     // Listen to tab changes to auto-send notifications
     _tabController.addListener(_onTabChanged);
@@ -68,12 +70,9 @@ class _LocationSharingScreenState extends ConsumerState<LocationSharingScreen>
     super.dispose();
   }
 
-  /// Handle tab changes - auto-send notification when share tab is selected
+  /// Handle tab changes - no longer needed since share tab is removed
   void _onTabChanged() {
-    if (_tabController.index == 0) { // Share tab (index 0)
-      print('📍 LocationSharingScreen: Share tab selected - auto-sending notification to all users');
-      _autoSendNotificationToAllUsers();
-    }
+    // Share tab removed, no auto-send needed
   }
 
   /// Perform automatic location sharing when coming from quick action
@@ -177,7 +176,7 @@ class _LocationSharingScreenState extends ConsumerState<LocationSharingScreen>
 
   Future<void> _shareLocation() async {
     try {
-      print('📍 LocationSharingScreen: Starting automatic location sharing process...');
+      print('📍 LocationSharingScreen: Starting range-based location sharing process...');
       
       // Use the enhanced permission service for location sharing
       final hasPermission = await LocationPermissionService.requestLocationSharingPermission(context);
@@ -194,9 +193,13 @@ class _LocationSharingScreenState extends ConsumerState<LocationSharingScreen>
         return;
       }
       
-      print('✅ LocationSharingScreen: Location permission granted, proceeding with automatic sharing...');
+      print('✅ LocationSharingScreen: Location permission granted, getting current location...');
 
-      // Get current user info for automatic message
+      // Get current location
+      final locationService = ref.read(locationSharingServiceProvider);
+      final position = await locationService.getCurrentLocation();
+      
+      // Get current user info
       final currentUser = ref.read(authControllerProvider).profile;
       final userName = currentUser?.name ?? currentUser?.email ?? 'Unknown User';
       
@@ -205,16 +208,47 @@ class _LocationSharingScreenState extends ConsumerState<LocationSharingScreen>
       final formattedTime = DateFormat('dd/MM/yyyy HH:mm:ss').format(timestamp);
       final autoMessage = '📍 $userName shared location at $formattedTime';
       
-      // Now try to share location automatically
-      await ref.read(locationSharingControllerProvider.notifier).shareLocation(
+      // Show loading dialog
+      if (mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const AlertDialog(
+            content: Row(
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(width: 16),
+                Text('Finding nearby users...'),
+              ],
+            ),
+          ),
+        );
+      }
+      
+      // Share location with range-based notifications
+      final result = await locationService.shareLocationWithRange(
         message: autoMessage,
+        latitude: position.latitude,
+        longitude: position.longitude,
+        rangeKm: 10.0, // 10km range
       );
       
-      // Show success dialog with user count
+      // Close loading dialog
       if (mounted) {
-        _showLocationSharedDialog();
+        Navigator.of(context).pop();
       }
+      
+      // Show success dialog with range-based results
+      if (mounted) {
+        _showRangeBasedLocationSharedDialog(result);
+      }
+      
     } catch (e) {
+      // Close loading dialog if open
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+      
       String errorMessage = e.toString();
       
       // Handle specific location errors
@@ -474,6 +508,160 @@ class _LocationSharingScreenState extends ConsumerState<LocationSharingScreen>
     );
   }
 
+  void _showRangeBasedLocationSharedDialog(Map<String, dynamic> result) {
+    final notificationsSent = result['notificationsSent'] ?? 0;
+    final nearbyUsers = result['nearbyUsers'] as List<dynamic>? ?? [];
+    final range = result['range'] ?? 10.0;
+    final success = result['success'] ?? false;
+    
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              Icon(
+                success ? Icons.check_circle : Icons.warning,
+                color: success ? Colors.green : Colors.orange,
+                size: 28,
+              ),
+              const SizedBox(width: 12),
+              Text(success ? 'Location Shared!' : 'Location Shared with Issues'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                success 
+                    ? '📍 Your location has been shared with nearby users!'
+                    : '📍 Your location was shared but some notifications failed.',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+              const SizedBox(height: 16),
+              
+              // Range info
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.blue.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.location_searching, color: Colors.blue.shade700, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Search radius: ${LocationRangeService.getRangeDescription(range)}',
+                        style: TextStyle(
+                          color: Colors.blue.shade700,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              
+              // Notifications sent
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: success ? Colors.green.shade50 : Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: success ? Colors.green.shade200 : Colors.orange.shade200,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.notifications,
+                      color: success ? Colors.green.shade700 : Colors.orange.shade700,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        notificationsSent > 0 
+                            ? 'Notifications sent to $notificationsSent nearby user${notificationsSent == 1 ? '' : 's'}'
+                            : 'No users found within ${LocationRangeService.getRangeDescription(range)}',
+                        style: TextStyle(
+                          color: success ? Colors.green.shade700 : Colors.orange.shade700,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              
+              // Show nearby users if any
+              if (nearbyUsers.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Text(
+                  'Nearby users notified:',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey.shade700,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                ...nearbyUsers.take(3).map((user) => Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Row(
+                    children: [
+                      Icon(Icons.person, size: 16, color: Colors.grey.shade600),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${user['displayName']} (${LocationRangeService.formatDistance(user['distance'])})',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
+                )),
+                if (nearbyUsers.length > 3)
+                  Text(
+                    '... and ${nearbyUsers.length - 3} more',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey.shade500,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+              ],
+              
+              const SizedBox(height: 12),
+              Text(
+                'Users within range will receive a notification and can view your location on the map.',
+                style: TextStyle(
+                  color: Colors.grey.shade600,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   void _showLocationSharedDialog() {
     showDialog(
       context: context,
@@ -601,6 +789,11 @@ class _LocationSharingScreenState extends ConsumerState<LocationSharingScreen>
         centerTitle: true,
         actions: [
           IconButton(
+            icon: const Icon(Icons.location_on),
+            onPressed: () => _shareLocation(),
+            tooltip: 'Share Location',
+          ),
+          IconButton(
             icon: const Icon(Icons.info),
             onPressed: () => _showPermissionInfo(context),
             tooltip: 'Permission Info',
@@ -609,7 +802,6 @@ class _LocationSharingScreenState extends ConsumerState<LocationSharingScreen>
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
-            Tab(text: 'Share', icon: Icon(Icons.location_on)),
             Tab(text: 'Received', icon: Icon(Icons.download)),
             Tab(text: 'Users', icon: Icon(Icons.people)),
           ],
@@ -618,7 +810,6 @@ class _LocationSharingScreenState extends ConsumerState<LocationSharingScreen>
       body: TabBarView(
         controller: _tabController,
         children: [
-          _buildShareTab(locationState),
           _buildReceivedTab(locationState),
           _buildUsersTab(locationState),
         ],
@@ -626,310 +817,6 @@ class _LocationSharingScreenState extends ConsumerState<LocationSharingScreen>
     );
   }
 
-  Widget _buildShareTab(LocationSharingState state) {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Permission Status Card
-          Card(
-            color: Colors.blue.shade50,
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.info, color: Colors.blue.shade700),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'Location Permission Status',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  FutureBuilder<bool>(
-                    future: LocationPermissionService.hasLocationPermission(),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Row(
-                          children: [
-                            SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                            SizedBox(width: 8),
-                            Text('Checking permissions...'),
-                          ],
-                        );
-                      }
-                      
-                      final hasPermission = snapshot.data ?? false;
-                      return Row(
-                        children: [
-                          Icon(
-                            hasPermission ? Icons.check_circle : Icons.error,
-                            color: hasPermission ? Colors.green : Colors.red,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            hasPermission 
-                                ? 'Location permission granted' 
-                                : 'Location permission required',
-                            style: TextStyle(
-                              color: hasPermission ? Colors.green.shade700 : Colors.red.shade700,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 8),
-                  FutureBuilder<bool>(
-                    future: LocationPermissionService.isLocationServiceEnabled(),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const SizedBox.shrink();
-                      }
-                      
-                      final isEnabled = snapshot.data ?? false;
-                      return Row(
-                        children: [
-                          Icon(
-                            isEnabled ? Icons.check_circle : Icons.error,
-                            color: isEnabled ? Colors.green : Colors.red,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            isEnabled 
-                                ? 'Location services enabled' 
-                                : 'Location services disabled',
-                            style: TextStyle(
-                              color: isEnabled ? Colors.green.shade700 : Colors.red.shade700,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          
-          // Share Location Card
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    widget.autoShare ? 'Auto-Sharing Your Location' : 'Share Your Location',
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.blue.shade200),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.info, color: Colors.blue.shade700, size: 20),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            widget.autoShare 
-                                ? '📍 Location is being automatically shared with ALL logged-in users'
-                                : '📍 Location will be automatically shared with ALL logged-in users',
-                            style: TextStyle(
-                              color: Colors.blue.shade700,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // Real-time user count indicator
-                  FutureBuilder<List<UserLocation>>(
-                    future: ref.read(loggedInUsersProvider.future),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Card(
-                          child: Padding(
-                            padding: EdgeInsets.all(16.0),
-                            child: Row(
-                              children: [
-                                SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
-                                ),
-                                SizedBox(width: 12),
-                                Text('Loading user count...'),
-                              ],
-                            ),
-                          ),
-                        );
-                      }
-                      
-                      final users = snapshot.data ?? [];
-                      final userCount = users.length;
-                      
-                      return Card(
-                        color: userCount > 0 ? Colors.green.shade50 : Colors.orange.shade50,
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Row(
-                            children: [
-                              Icon(
-                                userCount > 0 ? Icons.people : Icons.person_off,
-                                color: userCount > 0 ? Colors.green.shade700 : Colors.orange.shade700,
-                                size: 24,
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      userCount > 0 
-                                          ? '📍 Location will be shared with $userCount user${userCount == 1 ? '' : 's'}'
-                                          : '⚠️ No other users online',
-                                      style: TextStyle(
-                                        color: userCount > 0 ? Colors.green.shade700 : Colors.orange.shade700,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
-                                      ),
-                                    ),
-                                    if (userCount > 0) ...[
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        'Tap "Share Location Now" to send your current location',
-                                        style: TextStyle(
-                                          color: Colors.green.shade600,
-                                          fontSize: 14,
-                                        ),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                  
-                  const SizedBox(height: 16),
-                  if (!widget.autoShare) ...[
-                    ElevatedButton.icon(
-                      onPressed: state.isSharing ? null : _shareLocation,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      icon: state.isSharing
-                          ? const SizedBox(
-                              height: 24,
-                              width: 24,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                              ),
-                            )
-                          : const Icon(Icons.location_on, size: 24),
-                      label: Text(
-                        state.isSharing ? 'Sharing Location...' : '📍 Share Location Now',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ] else ...[
-                    // Show auto-sharing status when coming from quick action
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.green.shade50,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.green.shade200),
-                      ),
-                      child: Row(
-                        children: [
-                          if (state.isSharing) ...[
-                            const SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            const Text(
-                              '📍 Auto-sharing your location...',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.green,
-                              ),
-                            ),
-                          ] else ...[
-                            const Icon(Icons.check_circle, color: Colors.green, size: 24),
-                            const SizedBox(width: 12),
-                            const Text(
-                              '✅ Location shared successfully!',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.green,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Expanded(
-            child: _buildMySharesList(state.myShares),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildReceivedTab(LocationSharingState state) {
     if (state.receivedShares.isEmpty) {

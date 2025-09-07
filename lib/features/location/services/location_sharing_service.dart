@@ -7,6 +7,7 @@ import '../../notifications/services/notification_service.dart';
 import '../../notifications/services/push_notification_service.dart';
 import '../../notifications/services/fcm_service.dart';
 import '../../notifications/services/backend_fcm_service.dart';
+import '../../notifications/services/range_notification_service.dart';
 
 
 class LocationSharingService {
@@ -15,7 +16,95 @@ class LocationSharingService {
 
   LocationSharingService(this._firestore, this._auth);
 
-  /// Share current location with other logged-in users
+  /// Share current location with users within 10km range
+  Future<Map<String, dynamic>> shareLocationWithRange({
+    required String message,
+    required double latitude,
+    required double longitude,
+    String? address,
+    double rangeKm = 10.0,
+  }) async {
+    try {
+      print('📍 LocationSharingService: Sharing location with range-based notifications...');
+      
+      final user = _auth.currentUser;
+      if (user == null) throw Exception('User not authenticated');
+
+      // Get user profile
+      final userDoc = await _firestore.collection('users').doc(user.uid).get();
+      String userName = 'Unknown User';
+      
+      if (userDoc.exists) {
+        final userData = userDoc.data()!;
+        userName = userData['displayName'] as String? ?? 
+                  userData['name'] as String? ?? 
+                  user.email?.split('@')[0] ?? 'User';
+      } else {
+        userName = user.email?.split('@')[0] ?? 'User';
+      }
+
+      // Create location share
+      final locationShare = LocationShare(
+        id: '', // Will be set by Firestore
+        senderUid: user.uid,
+        senderName: userName,
+        latitude: latitude,
+        longitude: longitude,
+        address: address,
+        message: message,
+        timestamp: DateTime.now(),
+        isActive: true,
+      );
+
+      // Save to Firestore
+      await _firestore.collection('locationShares').add(locationShare.toMap())
+          .timeout(const Duration(seconds: 15));
+
+      // Update user's last known location
+      try {
+        await _firestore.collection('users').doc(user.uid).update({
+          'lastLocation': {
+            'latitude': latitude,
+            'longitude': longitude,
+            'timestamp': FieldValue.serverTimestamp(),
+          },
+          'lastLocationShare': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        }).timeout(const Duration(seconds: 15));
+        print('✅ LocationSharingService: User location updated successfully');
+      } catch (e) {
+        print('⚠️ LocationSharingService: Failed to update user location (continuing): $e');
+      }
+
+      // Send range-based notifications
+      final notificationResult = await RangeNotificationService.sendLocationShareNotification(
+        latitude: latitude,
+        longitude: longitude,
+        senderName: userName,
+        message: message,
+        rangeKm: rangeKm,
+      );
+
+      // Show local confirmation
+      await NotificationService.showNotification(
+        title: '📍 Location Shared',
+        body: notificationResult['message'] ?? 'Location shared with nearby users',
+        payload: {
+          'type': 'location_shared_range',
+          'notificationsSent': notificationResult['notificationsSent'] ?? 0,
+          'range': rangeKm,
+        },
+      );
+
+      return notificationResult;
+
+    } catch (e) {
+      print('❌ LocationSharingService: Error sharing location with range: $e');
+      throw Exception('Failed to share location: $e');
+    }
+  }
+
+  /// Share current location with other logged-in users (legacy method)
   Future<void> shareLocation({
     required String message,
     required double latitude,

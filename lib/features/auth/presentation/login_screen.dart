@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/routing/app_router.dart';
 import '../../../core/utils/validators.dart';
+import '../../../core/widgets/animated_logo.dart';
+import '../../../core/widgets/powered_by_branding.dart';
 import '../providers/auth_providers.dart';
 import '../../../core/services/firebase_connectivity_service.dart';
 
@@ -56,41 +58,63 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Login'),
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            AnimatedLogo(
+              size: 28.0,
+              showText: false,
+              autoAnimate: true,
+            ),
+            const SizedBox(width: 8),
+            const Text('Login'),
+          ],
+        ),
         centerTitle: true,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const SizedBox(height: 48),
-              const Icon(
-                Icons.login,
-                size: 80,
-                color: Colors.indigo,
-              ),
-              const SizedBox(height: 24),
-              const Text(
-                'Welcome Back',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Sign in to your account to continue',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 48),
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24.0),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 400),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const SizedBox(height: 20),
+                  // Animated Logo
+                  Center(
+                    child: AnimatedLogo(
+                      size: 120.0,
+                      showText: true,
+                      autoAnimate: true,
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  Text(
+                    'Welcome Back',
+                    style: TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.w700,
+                      color: Theme.of(context).colorScheme.primary,
+                      letterSpacing: 0.5,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Sign in to your account to continue',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.w400,
+                      letterSpacing: 0.3,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 40),
               
               TextFormField(
                 controller: _emailController,
@@ -148,13 +172,30 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               
               ElevatedButton(
                 onPressed: authState.isLoading ? null : _login,
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 2,
+                ),
                 child: authState.isLoading
                     ? const SizedBox(
                         height: 20,
                         width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
                       )
-                    : const Text('Login'),
+                    : const Text(
+                        'Login',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
               ),
               const SizedBox(height: 16),
               
@@ -162,9 +203,30 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 onPressed: authState.isLoading
                     ? null
                     : () => Navigator.of(context).pushReplacementNamed(AppRouter.register),
-                child: const Text('Don\'t have an account? Register'),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                child: Text(
+                  'Don\'t have an account? Register',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                    color: Theme.of(context).colorScheme.primary,
+                    letterSpacing: 0.3,
+                  ),
+                ),
               ),
-            ],
+              const SizedBox(height: 24),
+              
+              // Powered by branding
+              const PoweredByBranding(
+                textColor: Colors.grey,
+                textSize: 11.0,
+                imageHeight: 16.0,
+              ),
+                ],
+              ),
+            ),
           ),
         ),
       ),

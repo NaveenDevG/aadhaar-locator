@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../core/routing/app_router.dart';
 import '../../../core/utils/validators.dart';
+import '../../../core/widgets/animated_logo.dart';
+import '../../../core/widgets/powered_by_branding.dart';
 import '../providers/auth_providers.dart';
 import '../../../core/services/firebase_connectivity_service.dart';
 import '../services/aadhaar_validator.dart';
@@ -114,29 +116,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     } catch (e) {
       if (!mounted) return;
       
-      String errorMessage = e.toString();
-      Color backgroundColor = Colors.red;
-      
-      // Handle specific reCAPTCHA errors
-      if (errorMessage.contains('reCAPTCHA') || 
-          errorMessage.contains('network error') ||
-          errorMessage.contains('network-request-failed')) {
-        errorMessage = '''
-Registration failed due to reCAPTCHA verification issues.
-
-This is common in Android emulators. Try:
-• Using a real device
-• Checking internet connection
-• Using the "Fill Test Data" button below
-        ''';
-        backgroundColor = Colors.orange;
-      }
-      
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(errorMessage),
-          backgroundColor: backgroundColor,
-          duration: const Duration(seconds: 8),
+          content: Text(e.toString()),
+          backgroundColor: Colors.red,
         ),
       );
     }
@@ -149,84 +132,72 @@ This is common in Android emulators. Try:
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Register'),
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            AnimatedLogo(
+              size: 28.0,
+              showText: false,
+              autoAnimate: true,
+            ),
+            const SizedBox(width: 8),
+            const Text('Register'),
+          ],
+        ),
         centerTitle: true,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Icon(
-                Icons.person_add,
-                size: 80,
-                color: Colors.indigo,
-              ),
-              const SizedBox(height: 24),
-              const Text(
-                'Create Account',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Please provide your details to register',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 32),
-              
-              // Development Info (only show in development)
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.blue.shade200),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.info, color: Colors.blue.shade700),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Development Note',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.blue.shade700,
-                          ),
-                        ),
-                      ],
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24.0),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 400),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const SizedBox(height: 20),
+                  // Animated Logo
+                  Center(
+                    child: AnimatedLogo(
+                      size: 100.0,
+                      showText: true,
+                      autoAnimate: true,
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'If you encounter reCAPTCHA errors in the emulator, try using a real device or use the "Fill Test Data" button below.',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.blue.shade700,
-                      ),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    'Create Account',
+                    style: TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.w700,
+                      color: Theme.of(context).colorScheme.primary,
+                      letterSpacing: 0.5,
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Please provide your details to register',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.w400,
+                      letterSpacing: 0.3,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 32),
               
               // Basic Information
-              const Text(
+              Text(
                 'Basic Information',
                 style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(context).colorScheme.primary,
+                  letterSpacing: 0.3,
                 ),
               ),
               const SizedBox(height: 16),
@@ -280,11 +251,13 @@ This is common in Android emulators. Try:
               const SizedBox(height: 32),
               
               // Aadhaar Information
-              const Text(
+              Text(
                 'Aadhaar Information',
                 style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(context).colorScheme.primary,
+                  letterSpacing: 0.3,
                 ),
               ),
               const SizedBox(height: 8),
@@ -366,20 +339,30 @@ This is common in Android emulators. Try:
               
               ElevatedButton(
                 onPressed: authState.isLoading ? null : _register,
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 2,
+                ),
                 child: authState.isLoading
                     ? const SizedBox(
                         height: 20,
                         width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
                       )
-                    : const Text('Register'),
-              ),
-              const SizedBox(height: 16),
-              
-              // Test User Button (for development)
-              OutlinedButton(
-                onPressed: authState.isLoading ? null : _createTestUser,
-                child: const Text('Fill Test Data (Development)'),
+                    : const Text(
+                        'Register',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
               ),
               const SizedBox(height: 16),
               
@@ -387,42 +370,34 @@ This is common in Android emulators. Try:
                 onPressed: authState.isLoading
                     ? null
                     : () => Navigator.of(context).pushReplacementNamed(AppRouter.login),
-                child: const Text('Already have an account? Login'),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                child: Text(
+                  'Already have an account? Login',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                    color: Theme.of(context).colorScheme.primary,
+                    letterSpacing: 0.3,
+                  ),
+                ),
               ),
-            ],
+              const SizedBox(height: 24),
+              
+              // Powered by branding
+              const PoweredByBranding(
+                textColor: Colors.grey,
+                textSize: 11.0,
+                imageHeight: 16.0,
+              ),
+                ],
+              ),
+            ),
           ),
         ),
       ),
     );
   }
 
-  /// Create a test user for development
-  Future<void> _createTestUser() async {
-    try {
-      // Pre-fill with test data
-      _emailController.text = 'test.user@example.com';
-      _passwordController.text = 'TestPassword123!';
-      _nameController.text = 'Test User';
-      _aadhaarNameController.text = 'Test User Name';
-      _aadhaarNumberController.text = '123456789012';
-      
-      // Set a valid DOB (25 years ago)
-      final now = DateTime.now();
-      _selectedDob = DateTime(now.year - 25, now.month, now.day);
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Test data filled! Try registering again.'),
-          backgroundColor: Colors.blue,
-        ),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error setting test data: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
 }

@@ -308,6 +308,47 @@ class PushNotificationService {
     }
   }
 
+  /// Send notification directly to a specific FCM token
+  static Future<bool> sendToToken({
+    required String fcmToken,
+    required String title,
+    required String body,
+    Map<String, dynamic>? data,
+  }) async {
+    try {
+      print('📤 Push: Sending notification to token: ${fcmToken.substring(0, 20)}...');
+      
+      // Try Cloud Function first
+      try {
+        final result = await _functions
+            .httpsCallable('sendNotificationToToken')
+            .call({
+          'token': fcmToken,
+          'title': title,
+          'body': body,
+          'data': data ?? {},
+          'timestamp': FieldValue.serverTimestamp(),
+        });
+        
+        print('✅ Push: Notification sent via Cloud Function');
+        return true;
+      } catch (cloudFunctionError) {
+        print('⚠️ Push: Cloud Function failed, trying fallback: $cloudFunctionError');
+        
+        // Fallback: Send via local backend
+        return await _sendViaLocalBackend(
+          fcmToken: fcmToken,
+          title: title,
+          body: body,
+          data: data?.map((key, value) => MapEntry(key, value.toString())),
+        );
+      }
+    } catch (e) {
+      print('❌ Push: Failed to send notification to token: $e');
+      return false;
+    }
+  }
+
   /// Send notification via local FCM backend server
   static Future<bool> _sendViaLocalBackend({
     required String fcmToken,

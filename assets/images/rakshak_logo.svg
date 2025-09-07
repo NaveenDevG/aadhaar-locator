@@ -1,0 +1,31 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle with gradient -->
+  <defs>
+    <radialGradient id="backgroundGradient" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#FF6B35;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#E55A2B;stop-opacity:1" />
+    </radialGradient>
+    <linearGradient id="shieldGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFFFFF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#F0F0F0;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Main background circle -->
+  <circle cx="256" cy="256" r="240" fill="url(#backgroundGradient)" stroke="#D4D4D4" stroke-width="4"/>
+  
+  <!-- Shield shape -->
+  <path d="M256 120 L320 160 L320 240 C320 280 256 360 256 360 C256 360 192 280 192 240 L192 160 Z" 
+        fill="url(#shieldGradient)" 
+        stroke="#E0E0E0" 
+        stroke-width="2"/>
+  
+  <!-- Location pin inside shield -->
+  <circle cx="256" cy="200" r="12" fill="#FF6B35"/>
+  <path d="M256 220 L256 240 L248 240 L248 250 L264 250 L264 240 L256 240 Z" fill="#FF6B35"/>
+  
+  <!-- App name text -->
+  <text x="256" y="320" font-family="Arial, sans-serif" font-size="48" font-weight="bold" 
+        text-anchor="middle" fill="white">Rakshak</text>
+</svg>
+

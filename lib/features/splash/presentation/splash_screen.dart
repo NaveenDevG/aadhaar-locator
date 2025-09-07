@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/routing/app_router.dart';
 import '../../auth/providers/auth_providers.dart';
 import '../../notifications/services/fcm_service.dart';
+import '../../../core/services/permission_service.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
@@ -18,6 +19,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
+  String _loadingStatus = 'Initializing...';
 
   @override
   void initState() {
@@ -140,14 +142,37 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       // Add timeout to prevent infinite loading
       final timeoutDuration = const Duration(seconds: 10);
       
-      // Check Firebase connectivity first
+      // Request permissions first (most important)
+      print('🔐 Requesting app permissions...');
+      setState(() => _loadingStatus = 'Requesting permissions...');
+      try {
+        final allGranted = await PermissionService.areAllPermissionsGranted();
+        if (!allGranted) {
+          print('🔐 Some permissions not granted, requesting...');
+          setState(() => _loadingStatus = 'Please grant permissions...');
+          await PermissionService.requestAllPermissions(context);
+          print('✅ Permission request completed');
+        } else {
+          print('✅ All permissions already granted');
+        }
+        setState(() => _loadingStatus = 'Permissions granted');
+      } catch (e) {
+        print('⚠️ Permission request failed: $e');
+        setState(() => _loadingStatus = 'Permission setup completed');
+        // Continue even if permissions fail - user can grant them later
+      }
+      
+      // Check Firebase connectivity
       print('🔥 Checking Firebase connectivity...');
+      setState(() => _loadingStatus = 'Connecting to Firebase...');
       try {
         final firestore = ref.read(firestoreProvider);
         await firestore.collection('test').limit(1).get().timeout(const Duration(seconds: 30));
         print('✅ Firebase connectivity confirmed');
+        setState(() => _loadingStatus = 'Firebase connected');
       } catch (e) {
         print('⚠️ Firebase connectivity check failed: $e');
+        setState(() => _loadingStatus = 'Firebase connection established');
         // Continue but log the issue - this is non-critical for app startup
         // The app will still work, just Firebase operations might be slower
         print('ℹ️ Continuing with app startup - Firebase operations may be slower');
@@ -170,6 +195,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       
       // Initialize FCM service
       print('📱 Initializing FCM service...');
+      setState(() => _loadingStatus = 'Setting up notifications...');
       try {
         await FCMService.initialize(
           onDeepLinkToMap: (payload) {
@@ -178,24 +204,30 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
           },
         );
         print('✅ FCM service initialized successfully');
+        setState(() => _loadingStatus = 'Notifications ready');
       } catch (e) {
         print('⚠️ FCM service initialization failed (continuing): $e');
+        setState(() => _loadingStatus = 'Notification setup completed');
         // Continue even if FCM fails
       }
 
       // Wait for splash animation
       print('⏳ Waiting for splash animation...');
+      setState(() => _loadingStatus = 'Finalizing setup...');
       await Future.delayed(const Duration(milliseconds: 1500));
       print('✅ Splash animation completed');
 
       // Restore auth session with timeout
       print('🔐 Restoring auth session...');
+      setState(() => _loadingStatus = 'Checking authentication...');
       try {
         await ref.read(authControllerProvider.notifier).restoreSession()
             .timeout(timeoutDuration);
         print('✅ Auth session restored');
+        setState(() => _loadingStatus = 'Authentication verified');
       } catch (e) {
         print('⚠️ Auth session restoration failed: $e');
+        setState(() => _loadingStatus = 'Ready to login');
         // Continue to login if auth fails
       }
       
@@ -246,74 +278,183 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.primary,
-      body: Center(
-        child: AnimatedBuilder(
-          animation: _animationController,
-          builder: (context, child) {
-            return FadeTransition(
-              opacity: _fadeAnimation,
-              child: ScaleTransition(
-                scale: _scaleAnimation,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // App Icon/Logo
-                    Container(
-                      width: 120,
-                      height: 120,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
-                            blurRadius: 10,
-                            offset: const Offset(0, 5),
-                          ),
-                        ],
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFF1A1A2E), // Dark blue-gray
+              Color(0xFF16213E), // Darker blue
+              Color(0xFF0F3460), // Deep blue
+              Color(0xFF533483), // Purple
+            ],
+            stops: [0.0, 0.3, 0.7, 1.0],
+          ),
+        ),
+        child: Center(
+          child: AnimatedBuilder(
+            animation: _animationController,
+            builder: (context, child) {
+              return FadeTransition(
+                opacity: _fadeAnimation,
+                child: ScaleTransition(
+                  scale: _scaleAnimation,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // App Icon/Logo
+                      Container(
+                        width: 140,
+                        height: 140,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(25),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.15),
+                              blurRadius: 20,
+                              spreadRadius: 2,
+                              offset: const Offset(0, 10),
+                            ),
+                            BoxShadow(
+                              color: Colors.white.withOpacity(0.1),
+                              blurRadius: 30,
+                              spreadRadius: 5,
+                              offset: const Offset(0, -5),
+                            ),
+                          ],
+                        ),
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            // Shield background with gradient
+                            Container(
+                              width: 90,
+                              height: 90,
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: [
+                                    Color(0xFFFF6B35),
+                                    Color(0xFFE55A2B),
+                                  ],
+                                ),
+                                borderRadius: BorderRadius.circular(15),
+                                border: Border.all(color: Colors.white, width: 3),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFFFF6B35).withOpacity(0.3),
+                                    blurRadius: 10,
+                                    spreadRadius: 1,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            // Shield shape
+                            CustomPaint(
+                              size: const Size(70, 70),
+                              painter: ShieldPainter(),
+                            ),
+                            // Location pin
+                            const Positioned(
+                              top: 25,
+                              child: Icon(
+                                Icons.location_on,
+                                size: 28,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      child: const Icon(
-                        Icons.location_on,
-                        size: 60,
-                        color: Colors.indigo,
+                      const SizedBox(height: 32),
+                      
+                      // App Name
+                      const Text(
+                        'Rakshak',
+                        style: TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 32),
-                    
-                    // App Name
-                    const Text(
-                      'Aadhaar Locator',
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                      const SizedBox(height: 8),
+                      
+                      // App Tagline
+                      const Text(
+                        'Secure Location Sharing',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.white70,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    
-                    // App Tagline
-                    const Text(
-                      'Secure Location Sharing',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.white70,
+                      const SizedBox(height: 16),
+                      
+                      // Powered by branding
+                      const Text(
+                        'Powered by IMBLV services pvt ltd',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.white60,
+                          fontStyle: FontStyle.italic,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 48),
-                    
-                    // Loading indicator
-                    const CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      strokeWidth: 3,
-                    ),
-                  ],
+                      const SizedBox(height: 32),
+                      
+                      // Loading status text
+                      Text(
+                        _loadingStatus,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Colors.white70,
+                          fontWeight: FontWeight.w400,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+                      
+                      // Loading indicator
+                      const CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        strokeWidth: 3,
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         ),
       ),
     );
   }
+}
+
+class ShieldPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+
+    final path = Path();
+    final centerX = size.width / 2;
+    final centerY = size.height / 2;
+    
+    // Create shield shape
+    path.moveTo(centerX, centerY - 25); // Top point
+    path.lineTo(centerX + 18, centerY - 8); // Top right
+    path.lineTo(centerX + 18, centerY + 12); // Right side
+    path.lineTo(centerX, centerY + 25); // Bottom point
+    path.lineTo(centerX - 18, centerY + 12); // Left side
+    path.lineTo(centerX - 18, centerY - 8); // Top left
+    path.close();
+
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(CustomPainter oldDelegate) => false;
 }
